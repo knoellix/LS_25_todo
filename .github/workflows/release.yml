@@ -7,6 +7,9 @@ on:
     tags:
       - 'v*'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 permissions:
   contents: write   # create GitHub Release and upload the mod zip
 
@@ -16,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -96,10 +99,22 @@ jobs:
           ls -lh "${zip_path}"
 
       - name: Create GitHub Release and upload mod zip
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "Field To-Do List v${{ steps.version.outputs.VERSION }}"
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          files: .build/FS25_FieldToDoList.zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          zip_path=".build/FS25_FieldToDoList.zip"
+          release_title="Field To-Do List v${VERSION}"
+
+          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            echo "Release for ${TAG_NAME} exists -> updating asset"
+            gh release upload "${TAG_NAME}" "${zip_path}" --clobber
+            gh release edit "${TAG_NAME}" --title "${release_title}" --draft=false --prerelease=false
+          else
+            echo "Creating release for ${TAG_NAME}"
+            gh release create "${TAG_NAME}" "${zip_path}" \
+              --title "${release_title}" \
+              --generate-notes \
+              --latest
+          fi
