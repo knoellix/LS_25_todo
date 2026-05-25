@@ -56,8 +56,7 @@ Override: `FS25_MODS_DIR=/path/to/mods ./build.sh`
 
 ## Issues
 
-[GitHub Issues](https://github.com/knoellix/LS_25_todo/issues)  
-If the repository URL changes after merging to `main`, update this link accordingly.
+[GitHub Issues](https://github.com/knoellix/LS_25_todo/issues)
 
 ## License
 
