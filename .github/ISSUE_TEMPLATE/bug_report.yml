@@ -1,0 +1,74 @@
+name: Bug report
+description: Report a reproducible problem in FS25_FieldToDoList
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug.
+        Please provide enough detail so we can reproduce it quickly.
+
+  - type: input
+    id: mod_version
+    attributes:
+      label: Mod version
+      description: Version from `modDesc.xml` or release tag
+      placeholder: e.g. 0.1.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: game_version
+    attributes:
+      label: FS25 version
+      placeholder: e.g. 1.6.x.x
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Platform, active DLC/mods (especially Precision Farming, Seasonal Crop Stress), savegame context
+      placeholder: |
+        - Platform: Linux / Windows / macOS
+        - DLC/Mods: ...
+        - Savegame: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ESC menu...
+        2. Select field...
+        3. Click ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / screenshots
+      description: Paste snippets from `log.txt` and add screenshots if possible
+      render: shell
+    validations:
+      required: false

@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<!--
+    Layout: FS25_SeasonalCropStress CsPDAScreen (two columns, negative Y).
+    Actions: footer menuButtonInfo + inline mini buttons for full action set.
+-->
+<GUI name="menuFieldToDo">
+    <GuiElement profile="fs25_menuContainer">
+        <GuiElement profile="fs25_menuHeaderPanel" position="-200px 90px" width="800px">
+            <Text profile="fs25_menuHeaderTitle" id="categoryHeaderText" text="$l10n_ftdl_menu_title"/>
+        </GuiElement>
+
+        <GuiElement profile="fs25_subCategorySelectorTabbedContainer" position="0px 0px">
+
+            <!-- Left: manual To-Do -->
+            <ThreePartBitmap width="460px" height="700px" position="0px 100px">
+                <GuiElement profile="fs25_subCategoryContainer" width="420px">
+                    <Text profile="ftdlSectionHeader" text="$l10n_ftdl_section_todo" position="10px -10px"/>
+
+                    <GuiElement profile="ftdlListHeaderRow" position="0px -40px">
+                        <Text profile="ftdlColHeader" position="8px 0px" size="44px 24px" text=""/>
+                        <Text profile="ftdlColHeader" position="56px 0px" size="360px 24px" text="$l10n_ftdl_col_task"/>
+                    </GuiElement>
+
+                    <GuiElement profile="ftdlListWrapper" position="0px -72px" width="420px" height="540px">
+                        <SmoothList id="taskList" profile="ftdlSmoothList"
+                                    startClipperElementName="todoListStart"
+                                    endClipperElementName="todoListEnd"
+                                    focusInit="onOpen" onSelectionChanged="onTaskSelectionChanged">
+                            <ListItem profile="ftdlListRow" name="taskRowTemplate" onClick="onClickTaskRow">
+                                <Bitmap profile="ftdlRowBg" name="alternating"/>
+                                <Text profile="ftdlCellCenter" name="status" size="44px 30px"/>
+                                <Text profile="ftdlCellLeft" name="text" position="56px 0px" size="360px 30px" textLayoutMode="scrolling"/>
+                            </ListItem>
+                        </SmoothList>
+                        <Bitmap profile="fs25_secondaryMenuStartClipper" name="todoListStart"/>
+                        <Bitmap profile="fs25_secondaryMenuStopClipper" name="todoListEnd"/>
+                    </GuiElement>
+
+                    <Text profile="ftdlEmptyHint" id="todoEmptyHint"
+                          text="$l10n_ftdl_empty_tasks"
+                          position="10px -320px" size="400px 28px" visible="false"/>
+
+                    <Bitmap profile="ftdlMiniBtnBg" position="0px -580px"/>
+                    <Button profile="ftdlMiniBtnIconText" id="btnAdd" position="0px -580px" onClick="onClickAddTask" text="$l10n_ftdl_btn_add"/>
+
+                    <Bitmap profile="ftdlMiniBtnBg" position="126px -580px"/>
+                    <Button profile="ftdlMiniBtnIconText" id="btnEdit" position="126px -580px" onClick="onClickEditTask" text="$l10n_ftdl_btn_edit"/>
+
+                    <Bitmap profile="ftdlMiniBtnBg" position="252px -580px"/>
+                    <Button profile="ftdlMiniBtnIconText" id="btnDone" position="252px -580px" onClick="onClickToggleTask" text="$l10n_ftdl_btn_done"/>
+
+                    <Bitmap profile="ftdlMiniBtnBg" position="0px -616px"/>
+                    <Button profile="ftdlMiniBtnIconText" id="btnDelete" position="0px -616px" onClick="onClickDeleteTask" text="$l10n_ftdl_btn_delete"/>
+
+                    <Bitmap profile="ftdlMiniBtnBgNarrow" position="126px -616px"/>
+                    <Text profile="ftdlMiniBtnTextNarrow" position="126px -616px" text="↑"/>
+                    <Button profile="ftdlMiniBtnHitNarrow" position="126px -616px" onClick="onClickMoveTaskUp"/>
+
+                    <Bitmap profile="ftdlMiniBtnBgNarrow" position="190px -616px"/>
+                    <Text profile="ftdlMiniBtnTextNarrow" position="190px -616px" text="↓"/>
+                    <Button profile="ftdlMiniBtnHitNarrow" position="190px -616px" onClick="onClickMoveTaskDown"/>
+                </GuiElement>
+            </ThreePartBitmap>
+
+            <!-- Right: owned fields -->
+            <ThreePartBitmap width="960px" height="700px" position="500px 100px">
+                <GuiElement profile="fs25_subCategoryContainer" width="920px">
+                    <Text profile="ftdlSectionHeader" text="$l10n_ftdl_section_fields" position="10px -10px"/>
+
+                    <GuiElement profile="ftdlListHeaderRow" position="0px -40px">
+                        <Text profile="ftdlColHeader" id="hdr_fieldName" position="4px 0px" size="44px 24px" text="$l10n_ftdl_col_field"/>
+                        <Text profile="ftdlColHeader" id="hdr_fruit" position="50px 0px" size="68px 24px" text="$l10n_ftdl_col_fruit"/>
+                        <Text profile="ftdlColHeader" id="hdr_growth" position="120px 0px" size="22px 24px" text="$l10n_ftdl_col_growth"/>
+                        <Text profile="ftdlColHeader" id="hdr_harvest" position="144px 0px" size="64px 24px" text="$l10n_ftdl_col_harvest"/>
+                        <Text profile="ftdlColHeader" id="hdr_weed" position="210px 0px" size="44px 24px" text="$l10n_ftdl_col_weed"/>
+                        <Text profile="ftdlColHeader" id="hdr_stones" position="256px 0px" size="48px 24px" text="$l10n_ftdl_col_stones"/>
+                        <Text profile="ftdlColHeader" id="hdr_lime" position="306px 0px" size="34px 24px" text="$l10n_ftdl_col_lime"/>
+                        <Text profile="ftdlColHeader" id="hdr_roller" position="342px 0px" size="38px 24px" text="$l10n_ftdl_col_roller"/>
+                        <Text profile="ftdlColHeader" id="hdr_ph" position="382px 0px" size="34px 24px" text="pH" visible="false"/>
+                        <Text profile="ftdlColHeader" id="hdr_nitrogen" position="418px 0px" size="34px 24px" text="N" visible="false"/>
+                        <Text profile="ftdlColHeader" id="hdr_moisture" position="454px 0px" size="40px 24px" text="$l10n_ftdl_col_moisture" visible="false"/>
+                        <Text profile="ftdlColHeader" id="hdr_stress" position="496px 0px" size="40px 24px" text="$l10n_ftdl_col_stress" visible="false"/>
+                        <Text profile="ftdlColHeader" id="hdr_cycleSuggestion" position="536px 0px" size="52px 24px" text="$l10n_ftdl_col_cycle"/>
+                        <Text profile="ftdlColHeader" id="hdr_suggestion" position="592px 0px" size="320px 24px" text="$l10n_ftdl_col_suggestion"/>
+                    </GuiElement>
+
+                    <GuiElement profile="ftdlListWrapper" position="0px -72px" width="920px" height="460px">
+                        <SmoothList id="fieldList" profile="ftdlSmoothList"
+                                    startClipperElementName="fieldListStart"
+                                    endClipperElementName="fieldListEnd"
+                                    focusInit="onOpen">
+                            <ListItem profile="ftdlListRow" name="fieldRowTemplate" onClick="onClickFieldRow">
+                                <Bitmap profile="ftdlRowBg" name="alternating"/>
+                                <Text profile="ftdlCellSmall" name="fieldName" size="44px 30px" textLayoutMode="scrolling"/>
+                                <Text profile="ftdlCellSmallLeft" name="fruit" position="50px 0px" size="68px 30px" textLayoutMode="scrolling"/>
+                                <Text profile="ftdlCellSmall" name="growth" position="120px 0px" size="22px 30px"/>
+                                <Text profile="ftdlCellSmallLeft" name="harvest" position="144px 0px" size="64px 30px" textLayoutMode="scrolling"/>
+                                <Text profile="ftdlCellSmall" name="weed" position="210px 0px" size="44px 30px" textLayoutMode="scrolling"/>
+                                <Text profile="ftdlCellSmall" name="stones" position="256px 0px" size="48px 30px" textLayoutMode="scrolling"/>
+                                <Text profile="ftdlCellSmall" name="lime" position="306px 0px" size="34px 30px" textLayoutMode="scrolling"/>
+                                <Text profile="ftdlCellSmall" name="roller" position="342px 0px" size="38px 30px" textLayoutMode="scrolling"/>
+                                <Text profile="ftdlCellSmall" name="ph" position="382px 0px" size="34px 30px" visible="false"/>
+                                <Text profile="ftdlCellSmall" name="nitrogen" position="418px 0px" size="34px 30px" visible="false"/>
+                                <Text profile="ftdlCellSmall" name="moisture" position="454px 0px" size="40px 30px" visible="false"/>
+                                <Text profile="ftdlCellSmall" name="stress" position="496px 0px" size="40px 30px" visible="false"/>
+                                <Button profile="ftdlRowCycleHit" name="cycleSuggestion" position="536px 0px" onClick="onClickCycleFieldSuggestionInRow"/>
+                                <Text profile="ftdlCellSmall" name="cycleSuggestionLabel" position="536px 0px" size="40px 30px" text="&gt;"/>
+                                <Text profile="ftdlCellSmallLeft" name="suggestion" position="592px 0px" size="320px 30px" textLayoutMode="scrolling"/>
+                            </ListItem>
+                        </SmoothList>
+                        <Bitmap profile="fs25_secondaryMenuStartClipper" name="fieldListStart"/>
+                        <Bitmap profile="fs25_secondaryMenuStopClipper" name="fieldListEnd"/>
+                    </GuiElement>
+
+                    <Text profile="ftdlEmptyHint" id="fieldEmptyHint"
+                          text="$l10n_ftdl_empty_fields"
+                          position="10px -320px" size="880px 28px" visible="false"/>
+
+                    <Text profile="ftdlSettingsLabel" id="settingsWorkOrderLabel"
+                          text="$l10n_ftdl_settings_work_order"
+                          position="10px -548px" size="900px 28px" textLayoutMode="scrolling"/>
+
+                    <Bitmap profile="ftdlMiniBtnBg" position="0px -580px"/>
+                    <Text profile="ftdlMiniBtnText" position="0px -580px" text="$l10n_ftdl_btn_work_order"/>
+                    <Button profile="ftdlMiniBtnHit" position="0px -580px" onClick="onClickCycleWorkOrder"/>
+
+                    <Bitmap profile="ftdlMiniBtnBgWide" position="126px -580px"/>
+                    <Text profile="ftdlMiniBtnTextSmall" id="organicMultiPassBtnText" position="126px -580px" size="150px 34px" text="$l10n_ftdl_organic_once"/>
+                    <Button profile="ftdlMiniBtnHitWide" position="126px -580px" onClick="onClickToggleOrganicMultiPass"/>
+
+                    <Bitmap profile="ftdlMiniBtnBg" position="0px -616px"/>
+                    <Text profile="ftdlMiniBtnText" position="0px -616px" text="$l10n_ftdl_btn_visit"/>
+                    <Button profile="ftdlMiniBtnHit" position="0px -616px" onClick="onClickVisitField"/>
+
+                    <Bitmap profile="ftdlMiniBtnBg" position="126px -616px"/>
+                    <Text profile="ftdlMiniBtnText" position="126px -616px" text="$l10n_ftdl_btn_field_task"/>
+                    <Button profile="ftdlMiniBtnHit" position="126px -616px" onClick="onClickAddFieldTask"/>
+
+                    <Bitmap profile="ftdlMiniBtnBg" position="252px -616px"/>
+                    <Text profile="ftdlMiniBtnText" position="252px -616px" text="$l10n_ftdl_btn_adopt"/>
+                    <Button profile="ftdlMiniBtnHit" position="252px -616px" onClick="onClickAdoptFieldSuggestion"/>
+                </GuiElement>
+            </ThreePartBitmap>
+
+        </GuiElement>
+    </GuiElement>
+
+    <GUIProfiles>
+        <Profile name="ftdlSectionHeader" extends="fs25_textDefault" with="anchorTopLeft">
+            <textSize value="18px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.20 0.65 0.85 1.0"/>
+        </Profile>
+
+        <Profile name="ftdlListHeaderRow" extends="emptyPanel" with="anchorTopStretchingX">
+            <height value="24px"/>
+        </Profile>
+
+        <Profile name="ftdlColHeader" extends="fs25_textDefault" with="anchorTopLeft">
+            <textSize value="12px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="$preset_colorWhite_50"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+
+        <Profile name="ftdlListWrapper" extends="emptyPanel" with="anchorTopLeft"/>
+
+        <Profile name="ftdlSmoothList" extends="emptyPanel" with="anchorStretchingYLeft pivotTopLeft"/>
+
+        <Profile name="ftdlListRow" extends="emptyPanel" with="anchorTopStretchingX pivotTopLeft">
+            <height value="30px"/>
+        </Profile>
+
+        <Profile name="ftdlRowBg" extends="baseReference" with="anchorStretchingYStretchingX">
+            <imageColor value="$preset_fs25_colorGrey"/>
+            <imageSelectedColor value="0.10 0.35 0.55 0.85"/>
+            <alternateBackgroundColor value="$preset_fs25_colorGreyDark_50"/>
+        </Profile>
+
+        <Profile name="ftdlCellCenter" extends="fs25_textDefault" with="anchorStretchingYLeft">
+            <position value="4px 0px"/>
+            <textSize value="16px"/>
+            <textAlignment value="center"/>
+            <textColor value="$preset_fs25_colorMainLight"/>
+            <textSelectedColor value="$preset_fs25_colorMainDark"/>
+        </Profile>
+
+        <Profile name="ftdlCellLeft" extends="ftdlCellCenter">
+            <textAlignment value="left"/>
+        </Profile>
+
+        <Profile name="ftdlCellSmall" extends="ftdlCellCenter">
+            <textSize value="13px"/>
+        </Profile>
+
+        <Profile name="ftdlCellSmallLeft" extends="ftdlCellSmall">
+            <textAlignment value="left"/>
+        </Profile>
+
+        <Profile name="ftdlEmptyHint" extends="fs25_textDefault" with="anchorTopLeft">
+            <textSize value="14px"/>
+            <textAlignment value="center"/>
+            <textColor value="$preset_colorWhite_50"/>
+        </Profile>
+
+        <Profile name="ftdlSettingsLabel" extends="fs25_textDefault" with="anchorTopLeft">
+            <textSize value="14px"/>
+            <textAlignment value="left"/>
+            <textColor value="$preset_colorWhite_50"/>
+        </Profile>
+
+        <Profile name="ftdlRowCycleHit" extends="emptyPanel" with="anchorStretchingYLeft">
+            <size value="40px 30px"/>
+            <isFocusable value="true"/>
+        </Profile>
+
+        <Profile name="ftdlMiniBtnBg" extends="baseReference" with="anchorTopLeft">
+            <size value="118px 34px"/>
+            <imageColor value="0.18 0.18 0.20 1"/>
+        </Profile>
+
+        <Profile name="ftdlMiniBtnHit" extends="emptyPanel" with="anchorTopLeft">
+            <size value="118px 34px"/>
+            <isFocusable value="true"/>
+        </Profile>
+
+        <Profile name="ftdlMiniBtnText" extends="fs25_textDefault" with="anchorTopLeft">
+            <size value="118px 34px"/>
+            <textSize value="13px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+            <textColor value="1 1 1 1"/>
+        </Profile>
+
+        <Profile name="ftdlMiniBtnIconText" extends="ftdlMiniBtnHit">
+            <iconImageSize value="128 128"/>
+            <iconSize value="18px 18px"/>
+            <iconTextOffset value="-2px 0px"/>
+            <textSize value="13px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+            <textColor value="1 1 1 1"/>
+        </Profile>
+
+        <Profile name="ftdlMiniBtnTextSmall" extends="ftdlMiniBtnText">
+            <textSize value="13px"/>
+            <textUpperCase value="false"/>
+        </Profile>
+
+        <Profile name="ftdlMiniBtnTextNarrow" extends="ftdlMiniBtnText">
+            <size value="58px 34px"/>
+            <textSize value="22px"/>
+            <textUpperCase value="false"/>
+            <textBold value="true"/>
+        </Profile>
+
+        <Profile name="ftdlMiniBtnBgNarrow" extends="ftdlMiniBtnBg">
+            <size value="58px 34px"/>
+        </Profile>
+
+        <Profile name="ftdlMiniBtnHitNarrow" extends="ftdlMiniBtnHit">
+            <size value="58px 34px"/>
+        </Profile>
+
+        <Profile name="ftdlMiniBtnBgWide" extends="ftdlMiniBtnBg">
+            <size value="150px 34px"/>
+        </Profile>
+
+        <Profile name="ftdlMiniBtnHitWide" extends="ftdlMiniBtnHit">
+            <size value="150px 34px"/>
+        </Profile>
+    </GUIProfiles>
+</GUI>

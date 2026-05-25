@@ -1,0 +1,782 @@
+--[[
+    ToDoManager.lua
+    Manual task storage, savegame I/O hooks, and mod lifecycle.
+]]
+
+---@class ToDoManager
+---@field mission table
+---@field modDirectory string
+---@field modName string
+---@field fieldScanner FieldScanner
+---@field manualTasks table<number, table>
+---@field nextTaskId number
+---@field autoCheckTimer number
+ToDoManager = {}
+local ToDoManager_mt = Class(ToDoManager)
+
+ToDoManager.XML_KEY = "fieldToDoList"
+ToDoManager.XML_FILENAME = "fieldToDoList.xml"
+ToDoManager.AUTO_CHECK_INTERVAL_MS = 1500
+ToDoManager.SAVE_DEBOUNCE_MS = 2000
+
+local xmlSchema = nil
+
+---@param mission table
+---@param modDirectory string
+---@param modName string
+---@return ToDoManager
+function ToDoManager.new(mission, modDirectory, modName)
+    local self = setmetatable({}, ToDoManager_mt)
+
+    self.mission = mission
+    self.modDirectory = modDirectory
+    self.modName = modName
+    self.fieldScanner = FieldScanner.new(mission, modDirectory)
+    self.manualTasks = {}
+    self.nextTaskId = 1
+    self.nextSortIndex = 0
+    self.autoCheckTimer = 0
+    self.saveDebounceMs = nil
+
+    return self
+end
+
+---@param task table
+function ToDoManager:assignSortIndex(task)
+    self.nextSortIndex = (self.nextSortIndex or 0) + 1
+    task.sortIndex = self.nextSortIndex
+end
+
+function ToDoManager:normalizeTaskSortIndices()
+    local tasks = {}
+
+    for _, task in pairs(self.manualTasks) do
+        tasks[#tasks + 1] = task
+    end
+
+    table.sort(tasks, function(a, b)
+        if a.completed ~= b.completed then
+            return not a.completed and b.completed
+        end
+
+        return (tonumber(a.sortIndex) or a.id) < (tonumber(b.sortIndex) or b.id)
+    end)
+
+    for index, task in ipairs(tasks) do
+        task.sortIndex = index
+    end
+
+    self.nextSortIndex = #tasks
+end
+
+---@param a table
+---@param b table
+---@return boolean
+function ToDoManager.compareTasksForDisplay(a, b)
+    return (tonumber(a.sortIndex) or a.id) < (tonumber(b.sortIndex) or b.id)
+end
+
+function ToDoManager:delete()
+    if self.fieldScanner ~= nil then
+        self.fieldScanner:delete()
+        self.fieldScanner = nil
+    end
+
+    self.mission = nil
+    self.manualTasks = nil
+end
+
+---@return table[] tasks
+function ToDoManager:getManualTasks()
+    local tasks = {}
+
+    for _, task in pairs(self.manualTasks) do
+        table.insert(tasks, task)
+    end
+
+    table.sort(tasks, ToDoManager.compareTasksForDisplay)
+
+    return tasks
+end
+
+--- Same order as the ESC list (manual sortIndex, not work-order preset).
+---@return table[] tasks
+function ToDoManager:getManualTasksForDisplay()
+    return self:getManualTasks()
+end
+
+---@param taskId number
+---@param delta number
+---@return boolean
+function ToDoManager:moveTask(taskId, delta)
+    if taskId == nil or delta == nil or delta == 0 then
+        return false
+    end
+
+    local tasks = self:getManualTasks()
+    local currentIndex = nil
+
+    for index, task in ipairs(tasks) do
+        if task.id == taskId then
+            currentIndex = index
+            break
+        end
+    end
+
+    if currentIndex == nil then
+        return false
+    end
+
+    local targetIndex = currentIndex + math.floor(delta)
+    if targetIndex < 1 or targetIndex > #tasks then
+        return false
+    end
+
+    local currentTask = tasks[currentIndex]
+    local targetTask = tasks[targetIndex]
+
+    local currentSort = currentTask.sortIndex
+    currentTask.sortIndex = targetTask.sortIndex
+    targetTask.sortIndex = currentSort
+
+    self:requestDebouncedSave()
+    return true
+end
+
+--- Schedule a sidecar write after task edits (debounced).
+function ToDoManager:requestDebouncedSave()
+    self.saveDebounceMs = ToDoManager.SAVE_DEBOUNCE_MS
+end
+
+--- Persist tasks and advisor settings without waiting for a full savegame write.
+---@return boolean
+function ToDoManager:saveSettingsNow()
+    if self.mission == nil or self.mission.missionInfo == nil then
+        return false
+    end
+
+    if self.mission.missionInfo.isValid ~= true then
+        return false
+    end
+
+    local savegameDirectory = self.mission.missionInfo.savegameDirectory
+    if savegameDirectory == nil or savegameDirectory == "" then
+        return false
+    end
+
+    return self:saveToSavegameDirectory(savegameDirectory)
+end
+
+---@return table[] fields
+function ToDoManager:getOwnedFields()
+    if self.fieldScanner == nil then
+        return {}
+    end
+
+    return self.fieldScanner:scanOwnedFields()
+end
+
+---@param text string
+---@return table|nil task
+function ToDoManager:addManualTask(text)
+    if string.isNilOrWhitespace(text) then
+        return nil
+    end
+
+    local task = {
+        id = self.nextTaskId,
+        text = text,
+        completed = false,
+        source = "manual",
+        autoComplete = false,
+    }
+
+    self.manualTasks[task.id] = task
+    self.nextTaskId = self.nextTaskId + 1
+    self:assignSortIndex(task)
+    self:requestDebouncedSave()
+
+    return task
+end
+
+---@param fieldRecord table
+---@param actionLabel string|nil
+---@return string
+function ToDoManager:buildFieldTaskText(fieldRecord, actionLabel, action)
+    local fieldName = fieldRecord.name or string.format("Feld %s", tostring(fieldRecord.id or "?"))
+    local fruit = fieldRecord.fruit
+    local suggestion = actionLabel or fieldRecord.suggestion or "-"
+
+    if action ~= nil and FieldAdvisor ~= nil and FieldAdvisor.getShortActionLabel ~= nil then
+        suggestion = FieldAdvisor.getShortActionLabel(action)
+    elseif suggestion ~= nil then
+        suggestion = string.gsub(suggestion, " / gruppieren", "")
+        suggestion = string.gsub(suggestion, " / Gruppieren", "")
+    end
+
+    if fruit ~= nil and fruit ~= "" and fruit ~= "-" then
+        return string.format("%s (%s): %s", fieldName, fruit, suggestion)
+    end
+
+    return string.format("%s: %s", fieldName, suggestion)
+end
+
+---@param fieldId number
+---@param actionType string
+---@param action table|nil
+---@return table|nil
+function ToDoManager:findOpenFieldTask(fieldId, actionType, action)
+    local fertPass = action ~= nil and action.fertPass or nil
+
+    for _, task in pairs(self.manualTasks) do
+        if not task.completed
+            and task.source == "field"
+            and task.fieldId == fieldId
+            and task.actionType == actionType
+            and (tonumber(task.fertPass) or 1) == (tonumber(fertPass) or 1) then
+            return task
+        end
+    end
+
+    return nil
+end
+
+---@param fieldRecord table
+---@param action table|nil
+---@param allowUntrackable boolean|nil
+---@return table|nil task
+---@return string|nil errorKey
+function ToDoManager:addTaskFromFieldAction(fieldRecord, action, allowUntrackable)
+    if fieldRecord == nil then
+        return nil, "missing_field"
+    end
+
+    if action == nil then
+        action = {
+            actionType = fieldRecord.actionType or "none",
+            label = fieldRecord.suggestion or "-",
+            autoComplete = fieldRecord.autoComplete == true,
+        }
+    end
+
+    local actionType = action.actionType or "none"
+    if actionType == "none" then
+        return nil, "no_suggestion"
+    end
+
+    if action.autoComplete ~= true and allowUntrackable ~= true then
+        return nil, "not_trackable"
+    end
+
+    local existingTask = self:findOpenFieldTask(fieldRecord.id, actionType, action)
+    if existingTask ~= nil then
+        return existingTask, "already_exists"
+    end
+
+    local task = {
+        id = self.nextTaskId,
+        text = self:buildFieldTaskText(fieldRecord, action.label, action),
+        completed = false,
+        source = "field",
+        fieldId = fieldRecord.id,
+        fieldName = fieldRecord.name,
+        fruit = fieldRecord.fruit,
+        actionType = actionType,
+        suggestion = action.label,
+        autoComplete = action.autoComplete == true,
+        fertPass = action.fertPass,
+        fertPassTotal = action.fertPassTotal,
+    }
+
+    self.manualTasks[task.id] = task
+    self.nextTaskId = self.nextTaskId + 1
+    self:assignSortIndex(task)
+    self:requestDebouncedSave()
+
+    return task, nil
+end
+
+---@param fieldRecord table
+---@return table|nil task
+---@return string|nil errorKey
+function ToDoManager:addTaskFromFieldSuggestion(fieldRecord)
+    if fieldRecord == nil then
+        return nil, "missing_field"
+    end
+
+    local action = {
+        actionType = fieldRecord.actionType or "none",
+        label = fieldRecord.suggestion or "-",
+        autoComplete = fieldRecord.autoComplete == true,
+    }
+
+    return self:addTaskFromFieldAction(fieldRecord, action, false)
+end
+
+---@param fieldRecord table
+---@param text string
+---@param actionType string|nil
+---@param autoComplete boolean|nil
+---@return table|nil task
+function ToDoManager:addCustomFieldTask(fieldRecord, text, actionType, autoComplete)
+    if fieldRecord == nil or string.isNilOrWhitespace(text) then
+        return nil
+    end
+
+    local task = {
+        id = self.nextTaskId,
+        text = self:buildFieldTaskText(fieldRecord, text),
+        completed = false,
+        source = "field",
+        fieldId = fieldRecord.id,
+        fieldName = fieldRecord.name,
+        fruit = fieldRecord.fruit,
+        actionType = actionType or "custom",
+        suggestion = text,
+        autoComplete = autoComplete == true,
+    }
+
+    self.manualTasks[task.id] = task
+    self.nextTaskId = self.nextTaskId + 1
+    self:assignSortIndex(task)
+    self:requestDebouncedSave()
+
+    return task
+end
+
+---@return number
+function ToDoManager:updateAutoCompletion()
+    if self.fieldScanner == nil then
+        return 0
+    end
+
+    local completedCount = 0
+
+    for _, task in pairs(self.manualTasks) do
+        if not task.completed and task.source == "field" and task.autoComplete == true then
+            if FieldAdvisor.isFieldTaskComplete(task, self.fieldScanner) then
+                task.completed = true
+                completedCount = completedCount + 1
+            end
+        end
+    end
+
+    if completedCount > 0 then
+        self:requestDebouncedSave()
+    end
+
+    return completedCount
+end
+
+---@return boolean
+function ToDoManager:areGameFieldsReady()
+    if g_fieldManager == nil or g_fieldManager.fields == nil then
+        return false
+    end
+
+    return next(g_fieldManager.fields) ~= nil
+end
+
+function ToDoManager:update(dt)
+    if self.saveDebounceMs ~= nil then
+        self.saveDebounceMs = self.saveDebounceMs - dt
+        if self.saveDebounceMs <= 0 then
+            self.saveDebounceMs = nil
+            self:saveSettingsNow()
+        end
+    end
+
+    if not self:areGameFieldsReady() then
+        return
+    end
+
+    self.autoCheckTimer = self.autoCheckTimer + dt
+    if self.autoCheckTimer < ToDoManager.AUTO_CHECK_INTERVAL_MS then
+        return
+    end
+
+    self.autoCheckTimer = 0
+    self:updateAutoCompletion()
+end
+
+---@param taskId number
+---@param text string
+---@return boolean
+function ToDoManager:updateManualTask(taskId, text)
+    local task = self.manualTasks[taskId]
+    if task == nil or string.isNilOrWhitespace(text) then
+        return false
+    end
+
+    task.text = text
+    self:requestDebouncedSave()
+    return true
+end
+
+---@param taskId number
+---@return boolean
+function ToDoManager:deleteManualTask(taskId)
+    if self.manualTasks[taskId] == nil then
+        return false
+    end
+
+    self.manualTasks[taskId] = nil
+    self:requestDebouncedSave()
+    return true
+end
+
+---@param taskId number
+---@return boolean
+function ToDoManager:toggleManualTask(taskId)
+    local task = self.manualTasks[taskId]
+    if task == nil then
+        return false
+    end
+
+    task.completed = not task.completed
+    if task.completed then
+        self.nextSortIndex = (self.nextSortIndex or 0) + 1
+        task.sortIndex = self.nextSortIndex
+    end
+    self:requestDebouncedSave()
+    return true
+end
+
+---@param taskId number
+---@return table|nil
+function ToDoManager:getManualTask(taskId)
+    return self.manualTasks[taskId]
+end
+
+function ToDoManager.initXMLSchema()
+    if xmlSchema ~= nil then
+        return
+    end
+
+    xmlSchema = XMLSchema.new("fieldToDoList")
+    ToDoManager.registerSavegameXMLPaths(xmlSchema, ToDoManager.XML_KEY)
+end
+
+function ToDoManager.registerSavegameXMLPaths(schema, basePath)
+    schema:register(XMLValueType.INT, basePath .. "#nextTaskId", "Next task id counter")
+    schema:register(XMLValueType.STRING, basePath .. "#workOrderPreset", "Field work order preset key")
+    schema:register(XMLValueType.BOOL, basePath .. "#organicMultiPassEnabled", "Split organic fertilizing into multiple passes")
+    schema:register(XMLValueType.INT, basePath .. ".tasks.task(?)#id", "Task id")
+    schema:register(XMLValueType.INT, basePath .. ".tasks.task(?)#sortIndex", "Display order in the list")
+    schema:register(XMLValueType.STRING, basePath .. ".tasks.task(?)#text", "Task display text")
+    schema:register(XMLValueType.STRING, basePath .. ".tasks.task(?)#description", "Legacy task text attribute")
+    schema:register(XMLValueType.BOOL, basePath .. ".tasks.task(?)#completed", "Task completed flag")
+    schema:register(XMLValueType.STRING, basePath .. ".tasks.task(?)#source", "Task source (manual|field)")
+    schema:register(XMLValueType.INT, basePath .. ".tasks.task(?)#fieldId", "Linked field id")
+    schema:register(XMLValueType.STRING, basePath .. ".tasks.task(?)#fieldName", "Linked field name")
+    schema:register(XMLValueType.STRING, basePath .. ".tasks.task(?)#fruit", "Crop name at creation time")
+    schema:register(XMLValueType.STRING, basePath .. ".tasks.task(?)#actionType", "Field action key for auto-complete")
+    schema:register(XMLValueType.INT, basePath .. ".tasks.task(?)#fertPass", "Organic fertilizer pass index")
+    schema:register(XMLValueType.INT, basePath .. ".tasks.task(?)#fertPassTotal", "Organic fertilizer pass count")
+    schema:register(XMLValueType.STRING, basePath .. ".tasks.task(?)#suggestion", "Field suggestion label")
+    schema:register(XMLValueType.BOOL, basePath .. ".tasks.task(?)#autoComplete", "Whether task auto-completes from field state")
+end
+
+---@param xmlFile XMLFile
+---@param taskKey string
+---@return table|nil
+function ToDoManager:loadTaskFromXML(xmlFile, taskKey)
+    local taskId = xmlFile:getValue(taskKey .. "#id")
+    if taskId == nil then
+        return nil
+    end
+
+    local text = xmlFile:getValue(taskKey .. "#text")
+    if string.isNilOrWhitespace(text) then
+        text = xmlFile:getValue(taskKey .. "#description")
+    end
+
+    if string.isNilOrWhitespace(text) then
+        return nil
+    end
+
+    local task = {
+        id = taskId,
+        text = text,
+        completed = xmlFile:getValue(taskKey .. "#completed") == true,
+        source = xmlFile:getValue(taskKey .. "#source") or "manual",
+        autoComplete = xmlFile:getValue(taskKey .. "#autoComplete") == true,
+    }
+
+    local fieldId = xmlFile:getValue(taskKey .. "#fieldId")
+    if fieldId ~= nil then
+        task.fieldId = fieldId
+        task.fieldName = xmlFile:getValue(taskKey .. "#fieldName")
+        task.fruit = xmlFile:getValue(taskKey .. "#fruit")
+        task.actionType = xmlFile:getValue(taskKey .. "#actionType")
+        task.fertPass = xmlFile:getValue(taskKey .. "#fertPass")
+        task.fertPassTotal = xmlFile:getValue(taskKey .. "#fertPassTotal")
+        task.suggestion = xmlFile:getValue(taskKey .. "#suggestion")
+    end
+
+    if task.source == "field" and task.actionType ~= nil and task.actionType ~= "" and task.actionType ~= "custom" then
+        if task.autoComplete == nil then
+            task.autoComplete = true
+        end
+    end
+
+    task.sortIndex = tonumber(xmlFile:getValue(taskKey .. "#sortIndex")) or task.id
+
+    return task
+end
+
+---@param xmlFile XMLFile
+---@param key string
+function ToDoManager:loadFromXMLFile(xmlFile, key)
+    if xmlFile == nil or key == nil then
+        return
+    end
+
+    self.manualTasks = {}
+
+    local nextId = xmlFile:getValue(key .. "#nextTaskId")
+    self.nextTaskId = math.max(1, tonumber(nextId) or 1)
+
+    if FieldAdvisorSettings ~= nil then
+        FieldAdvisorSettings.loadFromXMLFile(xmlFile, key)
+    end
+
+    local index = 0
+    while true do
+        local taskKey = string.format("%s.tasks.task(%d)", key, index)
+        local task = self:loadTaskFromXML(xmlFile, taskKey)
+        if task == nil then
+            break
+        end
+
+        self.manualTasks[task.id] = task
+        if task.id >= self.nextTaskId then
+            self.nextTaskId = task.id + 1
+        end
+
+        index = index + 1
+    end
+
+    self:normalizeTaskSortIndices()
+    -- Auto-complete runs from update() once fields exist (not here — blocks Enter on mission start).
+end
+
+---@param xmlFile XMLFile
+---@param key string
+---@param task table
+---@param taskKey string
+function ToDoManager:saveTaskToXML(xmlFile, key, task, taskKey)
+    xmlFile:setValue(taskKey .. "#id", task.id)
+    xmlFile:setValue(taskKey .. "#sortIndex", tonumber(task.sortIndex) or task.id)
+    xmlFile:setValue(taskKey .. "#text", task.text)
+    xmlFile:setValue(taskKey .. "#completed", task.completed == true)
+    xmlFile:setValue(taskKey .. "#source", task.source or "manual")
+    xmlFile:setValue(taskKey .. "#autoComplete", task.autoComplete == true)
+
+    if task.source == "field" then
+        if task.fieldId ~= nil then
+            xmlFile:setValue(taskKey .. "#fieldId", task.fieldId)
+        end
+
+        if task.fieldName ~= nil then
+            xmlFile:setValue(taskKey .. "#fieldName", task.fieldName)
+        end
+
+        if task.fruit ~= nil then
+            xmlFile:setValue(taskKey .. "#fruit", task.fruit)
+        end
+
+        if task.actionType ~= nil then
+            xmlFile:setValue(taskKey .. "#actionType", task.actionType)
+        end
+
+        if task.fertPass ~= nil then
+            xmlFile:setValue(taskKey .. "#fertPass", task.fertPass)
+        end
+
+        if task.fertPassTotal ~= nil then
+            xmlFile:setValue(taskKey .. "#fertPassTotal", task.fertPassTotal)
+        end
+
+        if task.suggestion ~= nil then
+            xmlFile:setValue(taskKey .. "#suggestion", task.suggestion)
+        end
+    end
+end
+
+---@param xmlFile XMLFile
+---@param key string
+---@param usedModNames table|nil
+function ToDoManager:saveToXMLFile(xmlFile, key, usedModNames)
+    if xmlFile == nil or key == nil then
+        return
+    end
+
+    xmlFile:setValue(key .. "#nextTaskId", self.nextTaskId)
+
+    if FieldAdvisorSettings ~= nil then
+        FieldAdvisorSettings.saveToXMLFile(xmlFile, key)
+    end
+
+    local sortedTasks = self:getManualTasks()
+    table.sort(sortedTasks, function(a, b)
+        return a.id < b.id
+    end)
+
+    for index, task in ipairs(sortedTasks) do
+        local taskKey = string.format("%s.tasks.task(%d)", key, index - 1)
+        self:saveTaskToXML(xmlFile, key, task, taskKey)
+    end
+end
+
+---@param savegameDirectory string
+---@return "missing"|"failed"|"ok"
+function ToDoManager:loadFromSavegameDirectory(savegameDirectory)
+    if string.isNilOrWhitespace(savegameDirectory) then
+        return "missing"
+    end
+
+    ToDoManager.initXMLSchema()
+
+    local filePath = savegameDirectory .. "/" .. ToDoManager.XML_FILENAME
+    if not fileExists(filePath) then
+        return "missing"
+    end
+
+    local xmlFile = XMLFile.load("fieldToDoListLoad", filePath, xmlSchema)
+    if xmlFile == nil then
+        return "failed"
+    end
+
+    self:loadFromXMLFile(xmlFile, ToDoManager.XML_KEY)
+    xmlFile:delete()
+
+    return "ok"
+end
+
+---@param savegameDirectory string
+---@return boolean
+function ToDoManager:saveToSavegameDirectory(savegameDirectory)
+    if string.isNilOrWhitespace(savegameDirectory) then
+        return false
+    end
+
+    ToDoManager.initXMLSchema()
+
+    local filePath = savegameDirectory .. "/" .. ToDoManager.XML_FILENAME
+    local xmlFile = XMLFile.create("fieldToDoListSave", filePath, "fieldToDoList", xmlSchema)
+    if xmlFile == nil then
+        if FieldToDoLog ~= nil then
+            FieldToDoLog.error("fieldToDoList.xml: could not create for save (%s)", filePath)
+        end
+        return false
+    end
+
+    self:saveToXMLFile(xmlFile, ToDoManager.XML_KEY)
+    xmlFile:save()
+    xmlFile:delete()
+
+    return true
+end
+
+-- Mod lifecycle ----------------------------------------------------------------
+
+local modDirectory = g_currentModDirectory
+local modName = g_currentModName
+---@type ToDoManager|nil
+local todoManager
+
+local function isLoaded()
+    return todoManager ~= nil
+end
+
+local function load(mission)
+    if todoManager ~= nil then
+        unload()
+    end
+
+    todoManager = ToDoManager.new(mission, modDirectory, modName)
+    mission.fieldToDoList = todoManager
+
+    if FieldToDoHudOverlay ~= nil then
+        FieldToDoHudOverlay.instance = FieldToDoHudOverlay.new()
+        FieldToDoHudOverlay.instance:initialize()
+    end
+end
+
+local function unload()
+    if not isLoaded() then
+        return
+    end
+
+    todoManager:delete()
+    todoManager = nil
+
+    if FieldToDoHudOverlay ~= nil and FieldToDoHudOverlay.instance ~= nil then
+        FieldToDoHudOverlay.instance:delete()
+        FieldToDoHudOverlay.instance = nil
+    end
+
+    if g_currentMission ~= nil then
+        g_currentMission.fieldToDoList = nil
+    end
+end
+
+local function onStartMission(mission)
+    if not isLoaded() or mission == nil or mission.missionInfo == nil then
+        return
+    end
+
+    if mission.missionInfo.isValid ~= true then
+        return
+    end
+
+    local savegameDirectory = mission.missionInfo.savegameDirectory
+    local loadStatus = "missing"
+    if savegameDirectory ~= nil and savegameDirectory ~= "" then
+        loadStatus = todoManager:loadFromSavegameDirectory(savegameDirectory)
+    end
+
+    if FieldToDoLog ~= nil then
+        FieldToDoLog.logSavegameStartup(todoManager, savegameDirectory, loadStatus)
+    end
+end
+
+local function onSaveMission(missionInfo)
+    if not isLoaded() or missionInfo == nil or missionInfo.isValid ~= true then
+        return
+    end
+
+    local savegameDirectory = missionInfo.savegameDirectory
+    if savegameDirectory ~= nil and savegameDirectory ~= "" then
+        if not todoManager:saveToSavegameDirectory(savegameDirectory) and FieldToDoLog ~= nil then
+            FieldToDoLog.warning("fieldToDoList.xml: save failed (%s)", savegameDirectory)
+        end
+    end
+end
+
+local function init()
+    ToDoManager.initXMLSchema()
+
+    FSBaseMission.delete = Utils.appendedFunction(FSBaseMission.delete, unload)
+    Mission00.load = Utils.prependedFunction(Mission00.load, load)
+    Mission00.onStartMission = Utils.appendedFunction(Mission00.onStartMission, onStartMission)
+
+    if FSCareerMissionInfo ~= nil and FSCareerMissionInfo.saveToXMLFile ~= nil then
+        FSCareerMissionInfo.saveToXMLFile = Utils.appendedFunction(FSCareerMissionInfo.saveToXMLFile, onSaveMission)
+    end
+
+    FSBaseMission.update = Utils.appendedFunction(FSBaseMission.update, function(_, dt)
+        if todoManager ~= nil and dt ~= nil then
+            todoManager:update(dt)
+        end
+    end)
+
+    FSBaseMission.draw = Utils.appendedFunction(FSBaseMission.draw, function()
+        if FieldToDoHudOverlay ~= nil and FieldToDoHudOverlay.instance ~= nil then
+            FieldToDoHudOverlay.instance:draw()
+        end
+    end)
+end
+
+init()

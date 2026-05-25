@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<modDesc descVersion="98">
+    <author>knoellix</author>
+    <version>0.1.0.0</version>
+
+    <title>
+        <en>Field To-Do List</en>
+        <de>Feld-Aufgabenliste</de>
+    </title>
+
+    <description>
+        <en><![CDATA[
+Field work list and To-Dos for Farming Simulator 25.
+
+• ESC menu: manual tasks plus owned-field overview with suggested work steps
+• In-world HUD: toggle with Left Ctrl + F5 (max. 5 open tasks)
+• Work-order presets and organic Mist/slurry multi-pass (Mist/slurry → plow → Mist/slurry → sow → roll)
+• Adopt suggestions, visit field (teleport), auto-complete when work is done
+• Saves tasks and settings in fieldToDoList.xml per savegame
+
+Optional: Precision Farming (pH / nitrogen columns). Seasonal Crop Stress: not fully supported yet.
+
+Version 0.1.0.0 — pre-release development.
+        ]]></en>
+        <de><![CDATA[
+Feld-Arbeitsliste und To-Dos für Farming Simulator 25.
+
+• ESC-Menü: eigene Aufgaben und Feldübersicht mit Arbeitsschritten
+• HUD in der Welt: Linksktrl + F5 (max. 5 offene Aufgaben)
+• Reihenfolge-Presets und Mist/Gülle mehrfach (Mist/Gülle → Pflügen → Mist/Gülle → Säen → Walzen)
+• Vorschläge übernehmen, Feld besuchen (Teleport), Auto-Erledigt bei erledigter Arbeit
+• Speichert Aufgaben und Einstellungen in fieldToDoList.xml je Savegame
+
+Optional: Precision Farming (pH / Stickstoff). Seasonal Crop Stress: noch nicht voll unterstützt.
+
+Version 0.1.0.0 — Vorab-Entwicklung.
+        ]]></de>
+    </description>
+
+    <iconFilename>icon.dds</iconFilename>
+    <multiplayer supported="true"/>
+
+    <actions>
+        <action name="FTDTL_TOGGLE_TODO_HUD"/>
+    </actions>
+
+    <inputBinding>
+        <actionBinding action="FTDTL_TOGGLE_TODO_HUD">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_lctrl KEY_f5"/>
+        </actionBinding>
+    </inputBinding>
+
+    <l10n filenamePrefix="translations/translation" defaultLanguage="de"/>
+
+    <extraSourceFiles>
+        <sourceFile filename="scripts/FieldGameRules.lua"/>
+        <sourceFile filename="scripts/PrecisionFarmingBridge.lua"/>
+        <sourceFile filename="scripts/PrecisionFarmingReader.lua"/>
+        <sourceFile filename="scripts/FieldToDoL10n.lua"/>
+        <sourceFile filename="scripts/FieldToDoLog.lua"/>
+        <sourceFile filename="scripts/SeasonalCropStressReader.lua"/>
+        <sourceFile filename="scripts/FieldAdvisorSettings.lua"/>
+        <sourceFile filename="scripts/FieldActionPicker.lua"/>
+        <sourceFile filename="scripts/FieldAdvisor.lua"/>
+        <sourceFile filename="scripts/FieldScanner.lua"/>
+        <sourceFile filename="scripts/FieldVisit.lua"/>
+        <sourceFile filename="scripts/ToDoManager.lua"/>
+        <sourceFile filename="scripts/FieldToDoHudOverlay.lua"/>
+        <sourceFile filename="scripts/FieldToDoHudInput.lua"/>
+        <sourceFile filename="gui/FieldToDoMenuFrame.lua"/>
+        <sourceFile filename="scripts/InGameMenuIntegration.lua"/>
+    </extraSourceFiles>
+</modDesc>

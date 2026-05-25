@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<l10n>
+    <texts>
+        <text name="input_FTDTL_TOGGLE_TODO_HUD" text="To-Do HUD ein/aus"/>
+        <text name="ftdl_hud_title" text="Aufgaben"/>
+        <text name="ftdl_hud_empty" text="Keine Aufgaben"/>
+
+        <text name="ftdl_menu_title" text="Felder &amp; To-Do"/>
+        <text name="ftdl_section_todo" text="To-Do Liste"/>
+        <text name="ftdl_section_fields" text="Feldübersicht"/>
+        <text name="ftdl_col_task" text="Aufgabe"/>
+        <text name="ftdl_empty_tasks" text="Noch keine Aufgaben."/>
+        <text name="ftdl_btn_add" text="Hinzufügen"/>
+        <text name="ftdl_btn_edit" text="Bearbeiten"/>
+        <text name="ftdl_btn_done" text="Erledigt"/>
+        <text name="ftdl_btn_delete" text="Löschen"/>
+        <text name="ftdl_btn_up" text="Hoch"/>
+        <text name="ftdl_btn_down" text="Runter"/>
+
+        <text name="ftdl_col_field" text="Feld"/>
+        <text name="ftdl_col_fruit" text="Kultur"/>
+        <text name="ftdl_col_growth" text="St"/>
+        <text name="ftdl_col_harvest" text="Ernte"/>
+        <text name="ftdl_col_weed" text="Unkr"/>
+        <text name="ftdl_col_stones" text="Stein"/>
+        <text name="ftdl_col_lime" text="Kalk"/>
+        <text name="ftdl_col_roller" text="Walze"/>
+        <text name="ftdl_col_moisture" text="Feuchte"/>
+        <text name="ftdl_col_stress" text="Stress"/>
+        <text name="ftdl_col_cycle" text="Wechseln"/>
+        <text name="ftdl_col_suggestion" text="Vorschlag"/>
+        <text name="ftdl_empty_fields" text="Keine eigenen Felder gefunden."/>
+
+        <text name="ftdl_settings_work_order" text="Reihenfolge: %s  |  %s"/>
+        <text name="ftdl_btn_work_order" text="Reihenfolge"/>
+        <text name="ftdl_btn_visit" text="Besuchen"/>
+        <text name="ftdl_btn_field_task" text="Feld-Aufgabe"/>
+        <text name="ftdl_btn_adopt" text="übernehmen"/>
+
+        <text name="ftdl_footer_suggest_prev" text="Vorschlag ◀"/>
+        <text name="ftdl_footer_suggest_next" text="Vorschlag ▶"/>
+
+        <text name="ftdl_dialog_new_task" text="Neue Aufgabe"/>
+        <text name="ftdl_dialog_edit_task" text="Aufgabe bearbeiten"/>
+        <text name="ftdl_dialog_delete_task_title" text="Aufgabe löschen"/>
+        <text name="ftdl_dialog_delete_task_body" text="Aufgabe löschen?%s"/>
+        <text name="ftdl_dialog_field_task_title" text="Aufgabe für %s"/>
+        <text name="ftdl_dialog_field_task_pick_title" text="Aktion für %s wählen"/>
+        <text name="ftdl_picker_custom_text" text="Eigener Text ..."/>
+
+        <text name="ftdl_info_select_task" text="Bitte zuerst eine Aufgabe in der Liste anklicken."/>
+        <text name="ftdl_info_select_field" text="Bitte zuerst eine Feldzeile anklicken."/>
+        <text name="ftdl_info_select_field_overview" text="Bitte zuerst eine Feldzeile in der Feldübersicht anklicken."/>
+        <text name="ftdl_info_no_work_needed" text="%s: Kein Arbeitsschritt nötig (Alles ok)."/>
+        <text name="ftdl_info_reminder_only" text="%s: „%s“ ist nur eine Erinnerung — nutze „Feld-Aufgabe“ für eigene Notizen."/>
+        <text name="ftdl_info_adopt_failed" text="Vorschlag konnte nicht übernommen werden."/>
+        <text name="ftdl_info_already_in_list" text="Bereits in der To-Do-Liste:%s"/>
+        <text name="ftdl_info_field_position_missing" text="%s: Feldposition nicht gefunden."/>
+        <text name="ftdl_info_teleport_failed" text="Teleport zum Feld fehlgeschlagen."/>
+        <text name="ftdl_info_move_blocked" text="Reihenfolge hier nicht änderbar (bereits am Rand der Liste)."/>
+
+        <text name="ftdl_preset_standard" text="Pflügen → Kalk → Säen → Düngen"/>
+        <text name="ftdl_preset_lime_before_plow" text="Kalk → Pflügen → Säen → Düngen"/>
+        <text name="ftdl_preset_fert_before_sow" text="Düngen → Pflügen → Kalk → Säen"/>
+        <text name="ftdl_preset_sow_before_fert" text="Pflügen → Kalk → Säen → N-Düngen"/>
+        <text name="ftdl_preset_soil_then_fert" text="Bodenarbeit → Säen → Düngen"/>
+        <text name="ftdl_organic_once" text="Mist/Gülle: einmal"/>
+        <text name="ftdl_organic_multi" text="Mist/Gülle: mehrfach"/>
+        <text name="ftdl_organic_workflow" text="Mist/Gülle → Pflügen → Mist/Gülle → Säen → Mist/Gülle → Walzen"/>
+
+        <text name="ftdl_scs_off" text="SCS: aus"/>
+        <text name="ftdl_scs_loading" text="SCS: lädt…"/>
+        <text name="ftdl_scs_fields" text="SCS: %d Felder"/>
+
+        <text name="ftdl_action_all_ok" text="Alles ok"/>
+        <text name="ftdl_action_harvest" text="Ernten"/>
+        <text name="ftdl_action_withered" text="Verdorrt"/>
+        <text name="ftdl_action_stones" text="Steine"/>
+        <text name="ftdl_action_cultivate" text="Grubbern"/>
+        <text name="ftdl_action_plow" text="Pflügen"/>
+        <text name="ftdl_action_lime" text="Kalken"/>
+        <text name="ftdl_action_sow" text="Säen"/>
+        <text name="ftdl_action_roller" text="Walzen"/>
+        <text name="ftdl_action_weed_combat" text="Unkraut"/>
+        <text name="ftdl_action_weed_watch" text="Unkraut?"/>
+        <text name="ftdl_action_pf_ph" text="Kalk/pH"/>
+        <text name="ftdl_action_pf_n" text="Düngen"/>
+        <text name="ftdl_action_scs_moisture" text="Bewässern"/>
+        <text name="ftdl_action_scs_stress_high" text="Stress!"/>
+        <text name="ftdl_action_scs_stress_watch" text="Stress"/>
+        <text name="ftdl_action_harvest_info" text="Ernte"/>
+        <text name="ftdl_action_growing" text="Wächst"/>
+        <text name="ftdl_action_none" text="Ok"/>
+        <text name="ftdl_action_organic_pass" text="Mist/Gülle %d/%d"/>
+        <text name="ftdl_action_mist_pass" text="Mist %d/%d"/>
+        <text name="ftdl_action_slurry_pass" text="Gülle %d/%d"/>
+        <text name="ftdl_action_harvest_now" text="Jetzt ernten (%s)"/>
+        <text name="ftdl_action_harvest_window" text="Ernte %s"/>
+        <text name="ftdl_action_harvest_now_short" text="Jetzt (%s)"/>
+        <text name="ftdl_action_plow_after_harvest" text="Pflügen (nach Ernte)"/>
+        <text name="ftdl_action_cultivate_after_harvest" text="Grubbern (nach Ernte)"/>
+        <text name="ftdl_action_resow" text="Neu ansäen"/>
+        <text name="ftdl_action_sow_empty" text="Ansäen"/>
+        <text name="ftdl_action_stones_pick" text="Steine lesen"/>
+        <text name="ftdl_action_weed_combat_long" text="Unkraut bekämpfen"/>
+        <text name="ftdl_action_weed_watch_long" text="Unkraut beobachten"/>
+        <text name="ftdl_action_raise_ph" text="pH anheben (Kalk)"/>
+        <text name="ftdl_action_fert_n" text="Düngen (N)"/>
+        <text name="ftdl_action_irrigate_dry" text="Bewässern (trocken)"/>
+        <text name="ftdl_action_stress_high" text="Pflanzenstress hoch"/>
+        <text name="ftdl_action_stress_watch" text="Stress beobachten"/>
+        <text name="ftdl_action_preview_more" text="%s (+%d)"/>
+
+        <text name="ftdl_val_none" text="kein"/>
+        <text name="ftdl_val_yes" text="ja"/>
+        <text name="ftdl_val_no" text="nein"/>
+        <text name="ftdl_val_ok" text="ok"/>
+        <text name="ftdl_val_disabled" text="(aus)"/>
+        <text name="ftdl_val_growth_stage" text="St.%d"/>
+        <text name="ftdl_val_lime_level" text="K%d"/>
+        <text name="ftdl_val_month_count" text="%d Mon."/>
+
+        <text name="ftdl_weed_light" text="leicht"/>
+        <text name="ftdl_weed_medium" text="mittel"/>
+        <text name="ftdl_weed_heavy" text="stark"/>
+    </texts>
+</l10n>

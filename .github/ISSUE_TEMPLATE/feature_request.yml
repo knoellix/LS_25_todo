@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest an improvement or new workflow
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share the problem first, then the proposed feature.
+        This helps us evaluate impact and implementation options.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What is currently hard or missing?
+      placeholder: "I want to ..., but currently ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      placeholder: Describe behavior, UI, and expected result
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Workarounds or other ideas you tried
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Include screenshots, mockups, or links if available
+    validations:
+      required: false
