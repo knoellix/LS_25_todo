@@ -48,16 +48,8 @@ FieldTaskCompletion.REGISTRY = {
         grassStep = "mow",
         coverageOnly = true,
     },
-    grass_swath = {
-        strategy = "grass",
-        grassStep = "swath",
-        coverageOnly = true,
-    },
-    grass_collect = {
-        strategy = "grass",
-        grassStep = "collect",
-        coverageOnly = true,
-    },
+    grass_swath = { strategy = "none" },
+    grass_collect = { strategy = "none" },
     harvest = { strategy = "point" },
     weed_combat = { strategy = "point" },
     weed_watch = { strategy = "point" },
@@ -494,12 +486,12 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
     end
 
     if actionType == "grass_mow" then
-        return FieldAdvisor.isGrassCut(fieldState)
+        return FieldAdvisor.isGrassCut(fieldState, field)
     end
 
     -- No reliable windrow marker in fieldState; baseline heuristics only.
     if actionType == "grass_swath" then
-        if not FieldAdvisor.isGrassCut(fieldState) then
+        if not FieldAdvisor.isGrassCut(fieldState, field) then
             return false
         end
 
@@ -525,7 +517,7 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
     -- No reliable windrow marker in fieldState; baseline heuristics only.
     if actionType == "grass_collect" then
         local baseline = actionMeta ~= nil and actionMeta.completionBaseline or nil
-        return FieldAdvisor.isGrassPostCutCleared(fieldState, baseline)
+        return FieldAdvisor.isGrassPostCutCleared(fieldState, baseline, field)
     end
 
     if actionType == "grass_bale" or actionType == "grass_silage_bale" then

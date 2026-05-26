@@ -19,6 +19,7 @@
 
         <text name="ftdl_col_field" text="Field"/>
         <text name="ftdl_col_fruit" text="Crop"/>
+        <text name="ftdl_fruit_grass" text="Grass"/>
         <text name="ftdl_fruit_partial_grass" text="Grass (part. worked)"/>
         <text name="ftdl_fruit_partial_fallow" text="Fallow (part.)"/>
         <text name="ftdl_col_growth" text="St"/>

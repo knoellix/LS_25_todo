@@ -19,6 +19,7 @@
 
         <text name="ftdl_col_field" text="Feld"/>
         <text name="ftdl_col_fruit" text="Kultur"/>
+        <text name="ftdl_fruit_grass" text="Gras"/>
         <text name="ftdl_fruit_partial_grass" text="Gras (teilw. bearb.)"/>
         <text name="ftdl_fruit_partial_fallow" text="Brache (teilw.)"/>
         <text name="ftdl_col_growth" text="St"/>

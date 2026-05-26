@@ -12,7 +12,7 @@
 - **In-world HUD:** `Left Ctrl + F5` — compact list of open tasks (top right, up to 5 entries)
 - **Work order:** presets (e.g. plow → lime → sow → fertilize) and **alternating manure/slurry** for organic multi-pass spreading
 - **Field workflow:** adopt suggestions, visit field (teleport), auto-complete when the game detects the job is done
-- **List order:** ▲ / ▼ buttons to move the selected task up or down (no drag-and-drop in the Giants UI)
+- **List order:** `Hoch` / `Runter` mini buttons (`^` / `v`) move the selected task (no drag-and-drop in the Giants UI)
 - **Done behavior:** completed tasks are grouped below open tasks; newly completed go to the top of the done group; max 10 completed (oldest pruned)
 - **Selection UX:** after move, the moved task stays selected; after delete, selection is cleared
 - **Harvest hints:** field suggestion column shows month labels instead of ambiguous month counts
@@ -60,6 +60,11 @@ Override: `FS25_MODS_DIR=/path/to/mods ./build.sh`
 ## Issues
 
 [GitHub Issues](https://github.com/knoellix/LS_25_todo/issues)
+
+## Current Work In Progress
+
+- Grass workflow is currently being refined (detection and suggestion quality across different grass/meadow states).
+- Auto-completion for grass-related to-dos is currently limited and still being improved.
 
 ## License
 

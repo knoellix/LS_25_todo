@@ -323,6 +323,10 @@ end
 
 function FieldToDoMenuFrame:refreshLists()
     local manager = self:getManager()
+    if manager ~= nil and manager.invalidateOwnedFieldsCache ~= nil then
+        manager:invalidateOwnedFieldsCache()
+    end
+
     if manager == nil then
         self.manualTasks = {}
         self.ownedFields = {}
@@ -862,6 +866,18 @@ function FieldToDoMenuFrame:onClickAdoptFieldSuggestion()
             field.name
         ))
         return
+    end
+
+    if (action.autoComplete ~= true or not FieldWorkCatalog.isTrackable(action.actionType))
+        and field.suggestionDetails ~= nil then
+        for _, candidate in ipairs(field.suggestionDetails) do
+            if candidate ~= nil
+                and candidate.autoComplete == true
+                and FieldWorkCatalog.isTrackable(candidate.actionType) then
+                action = candidate
+                break
+            end
+        end
     end
 
     local task, errorKey = manager:addTaskFromFieldAction(field, action, false)

@@ -21,6 +21,14 @@ local function registerHudAction(actionId, callback, labelKey, labelFallback)
         return
     end
 
+    if FieldToDoHudInput.lastEventId ~= nil then
+        local actionEvents = g_inputBinding.actionEvents
+        if actionEvents ~= nil and actionEvents[FieldToDoHudInput.lastEventId] ~= nil then
+            return
+        end
+        FieldToDoHudInput.lastEventId = nil
+    end
+
     local target = FieldToDoHudOverlay.instance or FieldToDoHudOverlay
     local ok, eventId = g_inputBinding:registerActionEvent(
         actionId,
@@ -111,6 +119,13 @@ function FieldToDoHudInput.install()
 
                 if InputAction.FTDTL_TOGGLE_TODO_HUD == nil then
                     return
+                end
+
+                if FieldToDoHudInput.lastEventId ~= nil then
+                    local actionEvents = g_inputBinding.actionEvents
+                    if actionEvents ~= nil and actionEvents[FieldToDoHudInput.lastEventId] ~= nil then
+                        return
+                    end
                 end
 
                 registerHudAction(

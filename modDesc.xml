@@ -16,6 +16,7 @@ Field work list and To-Dos for Farming Simulator 25.
 • In-world HUD: toggle with Left Ctrl + F5 (max. 5 open tasks)
 • Work-order presets and organic Mist/slurry multi-pass (Mist/slurry → plow → Mist/slurry → sow → roll)
 • Adopt suggestions, visit field (teleport), auto-complete when work is done
+• Grass-aware suggestions (mow when harvest-ready; avoid wrong "sow" on grass meadows)
 • Saves tasks and settings in fieldToDoList.xml per savegame
 
 Optional: Precision Farming (pH / nitrogen columns). Seasonal Crop Stress: not fully supported yet.
@@ -29,6 +30,7 @@ Feld-Arbeitsliste und To-Dos für Farming Simulator 25.
 • HUD in der Welt: Linksktrl + F5 (max. 5 offene Aufgaben)
 • Reihenfolge-Presets und Mist/Gülle mehrfach (Mist/Gülle → Pflügen → Mist/Gülle → Säen → Walzen)
 • Vorschläge übernehmen, Feld besuchen (Teleport), Auto-Erledigt bei erledigter Arbeit
+• Gras-sichere Vorschläge (Mähen bei Ernte-Reife; kein falsches „Säen“ auf Wiesen)
 • Speichert Aufgaben und Einstellungen in fieldToDoList.xml je Savegame
 
 Optional: Precision Farming (pH / Stickstoff). Seasonal Crop Stress: noch nicht voll unterstützt.

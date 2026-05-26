@@ -17,6 +17,7 @@ local ToDoManager_mt = Class(ToDoManager)
 ToDoManager.XML_KEY = "fieldToDoList"
 ToDoManager.XML_FILENAME = "fieldToDoList.xml"
 ToDoManager.AUTO_CHECK_INTERVAL_MS = 1000
+ToDoManager.OWNED_FIELDS_CACHE_MS = 900
 ToDoManager.SAVE_DEBOUNCE_MS = 2000
 --- Keep at most this many completed rows; oldest completed (lowest sortIndex) is removed.
 ToDoManager.MAX_COMPLETED_TASKS = 10
@@ -40,6 +41,8 @@ function ToDoManager.new(mission, modDirectory, modName)
     self.autoCheckTimer = 0
     self.saveDebounceMs = nil
     self.didEnsureCompletionBaselines = false
+    self.ownedFieldsCache = nil
+    self.ownedFieldsCacheAt = -1
 
     return self
 end
@@ -284,12 +287,27 @@ function ToDoManager:saveSettingsNow()
 end
 
 ---@return table[] fields
+function ToDoManager:invalidateOwnedFieldsCache()
+    self.ownedFieldsCache = nil
+    self.ownedFieldsCacheAt = -1
+end
+
+---@return table[] fields
 function ToDoManager:getOwnedFields()
     if self.fieldScanner == nil then
         return {}
     end
 
-    return self.fieldScanner:scanOwnedFields()
+    local now = g_time or 0
+    if self.ownedFieldsCache ~= nil
+        and self.ownedFieldsCacheAt >= 0
+        and now - self.ownedFieldsCacheAt <= ToDoManager.OWNED_FIELDS_CACHE_MS then
+        return self.ownedFieldsCache
+    end
+
+    self.ownedFieldsCache = self.fieldScanner:scanOwnedFields()
+    self.ownedFieldsCacheAt = now
+    return self.ownedFieldsCache
 end
 
 ---@param text string
