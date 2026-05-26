@@ -51,16 +51,31 @@ python3 tools/generate_assets.py   # optional, falls DDS-Assets fehlen
 ./build.sh
 ```
 
-Standardziel (Linux Steam/Proton): `~/.local/share/Steam/steamapps/compatdata/2300320/pfx/drive_c/users/steamuser/Documents/My Games/FarmingSimulator2025/mods/FS25_FieldToDoList.zip`  
-Override: `FS25_MODS_DIR=/pfad/zu/mods ./build.sh`
+Standardziel (Linux Steam/Proton):
+`~/.local/share/Steam/steamapps/compatdata/2300320/pfx/drive_c/users/steamuser/Documents/My Games/FarmingSimulator2025/mods/FS25_FieldToDoList.zip`
+
+Eigenes Ziel:
+
+```bash
+FS25_MODS_DIR=/pfad/zu/mods ./build.sh
+```
+
+## Mitwirken
+
+Beiträge sind willkommen (Bugfixes, Features, Übersetzungen).
+
+- Einstieg: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Übersetzungs-Workflow: [Übersetzungs-Issue öffnen](https://github.com/knoellix/LS_25_todo/issues/new?template=translation.yml)
+- Allgemeine Bugs/Features: [GitHub Issues](https://github.com/knoellix/LS_25_todo/issues)
 
 ## Bekannte Punkte / WIP
 
 - Der Grass-Workflow wird aktuell weiter verbessert (Erkennung und Vorschlagsqualität für verschiedene Grass-/Wiesen-Zustände).
-- Auto-Completion für grassbezogene To-Dos ist aktuell eingeschränkt und wird weiter ausgebaut.
+- Auto-Completion ist insgesamt noch in Arbeit und braucht breitere Tests auf realen Spielständen.
 
 ## Issues
 
+Bitte die Issue-Templates für Bugs, Features und Übersetzungen nutzen:
 [GitHub Issues](https://github.com/knoellix/LS_25_todo/issues)
 
 ## Lizenz

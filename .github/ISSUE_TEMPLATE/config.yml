@@ -3,3 +3,6 @@ contact_links:
   - name: Questions / discussion
     url: https://github.com/knoellix/LS_25_todo/discussions
     about: Ask usage questions or discuss ideas
+  - name: Translate the mod
+    url: https://github.com/knoellix/LS_25_todo/issues/new?template=translation.yml
+    about: New language or improved UI strings (see translation issue template)

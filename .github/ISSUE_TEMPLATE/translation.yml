@@ -1,0 +1,90 @@
+name: Translation / localization
+description: Offer a new language or improve existing UI strings
+title: "[Translation]: "
+labels:
+  - translation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping translate **FS25 Field To-Do List**.
+
+        **In-game UI strings** live in `translations/translation_<locale>.xml` (see `translation_en.xml` as the reference).
+        Register the file via existing `modDesc.xml` → `<l10n filenamePrefix="translations/translation" …/>` — add a new XML file only; no code change needed if all keys match.
+
+        **Optional:** Mod Hub title/description in `modDesc.xml` (`<title>`, `<description>`) for the same language.
+
+        You can open this issue to coordinate, or send a **pull request** directly with the checklist below.
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Full UI translation (all keys in translation_en.xml)
+        - Partial translation (I will list missing keys in the PR)
+        - Improve existing translation (fix wording only)
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: Language (human name)
+      description: e.g. Spanish, Français, Polski
+      placeholder: e.g. Spanish
+    validations:
+      required: true
+
+  - type: input
+    id: locale
+    attributes:
+      label: Locale / file suffix
+      description: FS25 file name will be `translations/translation_<locale>.xml` (usually ISO 639-1, e.g. `es`, `fr`, `pl`)
+      placeholder: e.g. es
+    validations:
+      required: true
+
+  - type: input
+    id: mod_version
+    attributes:
+      label: Based on mod version
+      description: Version from `modDesc.xml` or release tag you translated against
+      placeholder: e.g. 0.1.0.1
+    validations:
+      required: true
+
+  - type: textarea
+    id: delivery
+    attributes:
+      label: How will you contribute?
+      description: Link to fork/PR, attach XML, or note that you need help opening a PR
+      placeholder: |
+        - [ ] I will open a pull request
+        - [ ] I need help creating a PR (attach translation_es.xml here)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Contributor checklist
+      options:
+        - label: Copied `translations/translation_en.xml` → `translations/translation_<locale>.xml`
+        - label: Every `text name="..."` key from EN is present (currently ~121 keys; no missing names)
+        - label: XML entities escaped where needed (`&` → `&amp;` in attribute text)
+        - label: Short labels kept short (buttons, column headers, HUD) — tested in ESC menu if possible
+        - label: Optional — added `<locale>` blocks in `modDesc.xml` title/description for Mod Hub
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes for maintainers
+      description: Game language you tested, terms you were unsure about, FS25 official terminology used
+      placeholder: |
+        - Tested with game language: Español
+        - Used Giants terms for Plow / Lime / … where applicable
+    validations:
+      required: false
