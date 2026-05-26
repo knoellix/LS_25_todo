@@ -5,8 +5,9 @@
 
 FieldSavegameReader = {}
 
---- Never io.open fields.xml during gameplay: Proton sharing violations and empty files on conflict with vanilla save.
-FieldSavegameReader.ENABLE_DISK_READ = false
+--- One-shot cached read after gameplay starts (see deferReadsUntilGameplay / mayReadFieldsFile).
+--- Required for grass meadows: engine fieldState often has no fruitType at sample points.
+FieldSavegameReader.ENABLE_DISK_READ = true
 
 FieldSavegameReader.cache = nil
 FieldSavegameReader.cachePath = nil

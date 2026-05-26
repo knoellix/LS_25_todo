@@ -70,7 +70,13 @@ end
 ---@param field table
 ---@return string
 function FieldScanner:getGrowthLabel(field)
-    local fieldState = FieldAdvisor.getFieldState(field)
+    local posX, posZ = nil, nil
+    if field.getCenterOfFieldWorldPosition ~= nil then
+        posX, posZ = field:getCenterOfFieldWorldPosition()
+    end
+
+    local fieldId = field.getId ~= nil and field:getId() or 0
+    local fieldState = FieldAdvisor.getEnrichedFieldState(field, fieldId, posX, posZ)
     if fieldState ~= nil then
         return FieldAdvisor.formatGrowthLabel(fieldState)
     end
