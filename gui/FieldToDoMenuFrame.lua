@@ -232,12 +232,10 @@ function FieldToDoMenuFrame:onFrameOpen()
     FieldToDoMenuFrame:superClass().onFrameOpen(self)
     self:pushMenuButtons()
     self.listRefreshTimer = 0
+    self.fieldRescanTimer = 0
     self.deferredListReload = true
     self.deferredListReloadTimer = 0
     self.deferredListReloadAttempts = 0
-    if SeasonalCropStressReader ~= nil and SeasonalCropStressReader.refreshFieldData ~= nil then
-        SeasonalCropStressReader.refreshFieldData()
-    end
     self.scsFieldsReady = SeasonalCropStressReader ~= nil and SeasonalCropStressReader.isRuntimeReady()
     self:bindGuiControls()
     self:applyMiniButtonIcons()
@@ -253,9 +251,7 @@ function FieldToDoMenuFrame:onOpen()
 
     self:pushMenuButtons()
     self.listRefreshTimer = 0
-    if SeasonalCropStressReader ~= nil and SeasonalCropStressReader.refreshFieldData ~= nil then
-        SeasonalCropStressReader.refreshFieldData()
-    end
+    self.fieldRescanTimer = 0
     self.scsFieldsReady = SeasonalCropStressReader ~= nil and SeasonalCropStressReader.isRuntimeReady()
     self:bindGuiControls()
     self:applyMiniButtonIcons()
@@ -283,17 +279,6 @@ function FieldToDoMenuFrame:onFrameUpdate(dt)
         return
     end
 
-    if self.showCropStress and SeasonalCropStressReader ~= nil and not self.scsFieldsReady then
-        if SeasonalCropStressReader.refreshFieldData ~= nil then
-            SeasonalCropStressReader.refreshFieldData()
-        end
-        if SeasonalCropStressReader.isRuntimeReady() then
-            self.scsFieldsReady = true
-            self:updateSettingsWorkOrderLabel()
-            self:refreshLists()
-        end
-    end
-
     local manager = self:getManager()
     if manager == nil then
         return
@@ -306,7 +291,14 @@ function FieldToDoMenuFrame:onFrameUpdate(dt)
 
     self.listRefreshTimer = 0
     local completedCount = manager:updateAutoCompletion()
-    if completedCount > 0 then
+
+    self.fieldRescanTimer = (self.fieldRescanTimer or 0) + 1000
+    local shouldRescanFields = self.fieldRescanTimer >= 2500
+    if shouldRescanFields then
+        self.fieldRescanTimer = 0
+    end
+
+    if completedCount > 0 or shouldRescanFields then
         self:refreshLists()
     end
 end
@@ -353,13 +345,51 @@ function FieldToDoMenuFrame:refreshLists()
     end
 
     if self.taskList ~= nil then
-        self.taskList:reloadData()
-        self:syncTaskListSelection()
+        self:reloadTaskListData(true)
     end
 
     if self.fieldList ~= nil then
         self.fieldList:reloadData()
     end
+end
+
+--- Refresh manual tasks only (order/text). Keeps selectedTaskId; used after move/toggle.
+function FieldToDoMenuFrame:refreshManualTaskList()
+    local manager = self:getManager()
+    if manager == nil then
+        self.manualTasks = {}
+    else
+        manager:updateAutoCompletion()
+        self.manualTasks = manager:getManualTasks()
+    end
+
+    if self.selectedTaskId ~= nil and manager ~= nil and manager:getManualTask(self.selectedTaskId) == nil then
+        self.selectedTaskId = nil
+    end
+
+    if self.todoEmptyHint ~= nil then
+        self.todoEmptyHint:setVisible(#self.manualTasks == 0)
+    end
+
+    if self.taskList ~= nil then
+        self:reloadTaskListData(false)
+    end
+end
+
+---@param fullReload boolean|nil when true, rebuild list (menu open); else repaint rows only (reorder/toggle)
+function FieldToDoMenuFrame:reloadTaskListData(fullReload)
+    if self.taskList == nil then
+        return
+    end
+
+    self.ignoreTaskSelectionChanged = true
+    if fullReload == true or self.taskList.reloadVisibleItems == nil then
+        self.taskList:reloadData()
+    else
+        self.taskList:reloadVisibleItems()
+    end
+    self:syncTaskListSelection()
+    self.ignoreTaskSelectionChanged = false
 end
 
 ---@param taskId number|nil
@@ -395,22 +425,33 @@ function FieldToDoMenuFrame:syncTaskListSelection()
         return
     end
 
-  -- SmoothList selectedIndex is 0-based; populateCell uses 1-based index.
-    local selectedIndex = listIndex - 1
+  -- FS25 SmoothList: selectedIndex is 1-based; set selection before repainting cells.
+    local wasIgnoring = self.ignoreTaskSelectionChanged == true
 
-    self.ignoreTaskSelectionChanged = true
+    if not wasIgnoring then
+        self.ignoreTaskSelectionChanged = true
+    end
 
-    if self.taskList.setSelectedIndex ~= nil then
-        self.taskList:setSelectedIndex(selectedIndex)
+    local section = 1
+    if self.taskList.setSelectedItem ~= nil then
+        self.taskList:setSelectedItem(section, listIndex, true)
     else
-        self.taskList.selectedIndex = selectedIndex
+        self.taskList.selectedSectionIndex = section
+        self.taskList.selectedIndex = listIndex
+        if self.taskList.applyElementSelection ~= nil then
+            self.taskList:applyElementSelection()
+        end
     end
 
     if self.taskList.reloadVisibleItems ~= nil then
         self.taskList:reloadVisibleItems()
+    elseif self.taskList.applyElementSelection ~= nil then
+        self.taskList:applyElementSelection()
     end
 
-    self.ignoreTaskSelectionChanged = false
+    if not wasIgnoring then
+        self.ignoreTaskSelectionChanged = false
+    end
 end
 
 function FieldToDoMenuFrame:clearTaskListSelectionVisual()
@@ -418,19 +459,29 @@ function FieldToDoMenuFrame:clearTaskListSelectionVisual()
         return
     end
 
-    self.ignoreTaskSelectionChanged = true
+    local wasIgnoring = self.ignoreTaskSelectionChanged == true
 
-    if self.taskList.setSelectedIndex ~= nil then
-        self.taskList:setSelectedIndex(-1)
+    if not wasIgnoring then
+        self.ignoreTaskSelectionChanged = true
     end
 
-    self.taskList.selectedIndex = -1
+    if self.taskList.clearElementSelection ~= nil then
+        self.taskList:clearElementSelection()
+    else
+        self.taskList.selectedSectionIndex = 0
+        self.taskList.selectedIndex = 0
+        if self.taskList.applyElementSelection ~= nil then
+            self.taskList:applyElementSelection()
+        end
+    end
 
     if self.taskList.reloadVisibleItems ~= nil then
         self.taskList:reloadVisibleItems()
     end
 
-    self.ignoreTaskSelectionChanged = false
+    if not wasIgnoring then
+        self.ignoreTaskSelectionChanged = false
+    end
 end
 
 ---@param list SmoothList
@@ -983,18 +1034,7 @@ function FieldToDoMenuFrame:buildFieldTaskPickerActions(field)
         return fallback
     end
 
-    local manualDefaults = {
-        { actionType = "cultivate", pickerLabel = advisorText("ftdl_action_cultivate", "Grubbern"), autoComplete = true },
-        { actionType = "plow", pickerLabel = advisorText("ftdl_action_plow", "Pflügen"), autoComplete = true },
-        { actionType = "lime", pickerLabel = advisorText("ftdl_action_lime", "Kalken"), autoComplete = true },
-        { actionType = "sow", pickerLabel = advisorText("ftdl_action_sow", "Säen"), autoComplete = true },
-        { actionType = "roller", pickerLabel = advisorText("ftdl_action_roller", "Walzen"), autoComplete = true },
-        { actionType = "weed_combat", pickerLabel = advisorText("ftdl_action_weed_combat", "Unkraut"), autoComplete = true },
-        { actionType = "stones", pickerLabel = advisorText("ftdl_action_stones", "Steine"), autoComplete = true },
-        { actionType = "harvest", pickerLabel = advisorText("ftdl_action_harvest", "Ernten"), autoComplete = true },
-    }
-
-    for _, action in ipairs(manualDefaults) do
+    for _, action in ipairs(FieldWorkCatalog.buildPickerActions(advisorText)) do
         addAction(action)
     end
 
@@ -1178,16 +1218,11 @@ function FieldToDoMenuFrame:getTaskAtListIndex(listIndex)
     end
 
     local index = math.floor(tonumber(listIndex) or -1)
-    if index < 0 then
+    if index < 1 then
         return nil
     end
 
-    local task = self.manualTasks[index]
-    if task == nil then
-        task = self.manualTasks[index + 1]
-    end
-
-    return task
+    return self.manualTasks[index]
 end
 
 ---@param listIndex number|nil
@@ -1348,9 +1383,7 @@ function FieldToDoMenuFrame:onConfirmDeleteTask(yes)
     end
 
     manager:deleteManualTask(taskId)
-    if self.selectedTaskId == taskId then
-        self.selectedTaskId = nil
-    end
+    self.selectedTaskId = nil
     self:refreshLists()
 end
 
@@ -1371,7 +1404,7 @@ function FieldToDoMenuFrame:onClickToggleTask()
 
     self.selectedTaskId = task.id
     manager:toggleManualTask(task.id)
-    self:refreshLists()
+    self:refreshManualTaskList()
 end
 
 function FieldToDoMenuFrame:onClickMoveTaskUp()
@@ -1404,9 +1437,10 @@ function FieldToDoMenuFrame:moveSelectedTask(delta)
             "ftdl_info_move_blocked",
             "Reihenfolge hier nicht änderbar (Rand der Liste oder erledigte Aufgabe)."
         ))
+        self:syncTaskListSelection()
         return
     end
 
-    self.selectedTaskId = nil
-    self:refreshLists()
+    self.selectedTaskId = taskId
+    self:refreshManualTaskList()
 end

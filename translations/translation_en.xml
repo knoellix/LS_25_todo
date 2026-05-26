@@ -19,6 +19,8 @@
 
         <text name="ftdl_col_field" text="Field"/>
         <text name="ftdl_col_fruit" text="Crop"/>
+        <text name="ftdl_fruit_partial_grass" text="Grass (part. worked)"/>
+        <text name="ftdl_fruit_partial_fallow" text="Fallow (part.)"/>
         <text name="ftdl_col_growth" text="St"/>
         <text name="ftdl_col_harvest" text="Harvest"/>
         <text name="ftdl_col_weed" text="Weed"/>
@@ -74,6 +76,12 @@
 
         <text name="ftdl_action_all_ok" text="All OK"/>
         <text name="ftdl_action_harvest" text="Harvest"/>
+        <text name="ftdl_action_grass_mow" text="Mow"/>
+        <text name="ftdl_action_grass_mow_short" text="Mow"/>
+        <text name="ftdl_action_grass_swath" text="Swath"/>
+        <text name="ftdl_action_grass_collect" text="Collect / load"/>
+        <text name="ftdl_action_grass_bale" text="Bale"/>
+        <text name="ftdl_action_grass_silage_bale" text="Silage bale"/>
         <text name="ftdl_action_withered" text="Withered"/>
         <text name="ftdl_action_stones" text="Stones"/>
         <text name="ftdl_action_cultivate" text="Cultivate"/>
@@ -123,5 +131,6 @@
         <text name="ftdl_weed_light" text="light"/>
         <text name="ftdl_weed_medium" text="medium"/>
         <text name="ftdl_weed_heavy" text="heavy"/>
+        <text name="ftdl_weed_dead" text="dead"/>
     </texts>
 </l10n>

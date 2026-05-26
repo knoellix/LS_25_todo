@@ -9,6 +9,23 @@ SeasonalCropStressReader = {}
 
 SeasonalCropStressReader.MOD_NAME = "FS25_SeasonalCropStress"
 
+---@return boolean
+function SeasonalCropStressReader.isSaveInProgress()
+    if g_currentMission ~= nil then
+        if g_currentMission.isSaving == true or g_currentMission.isSavePending == true then
+            return true
+        end
+    end
+
+    if g_savegameController ~= nil then
+        if g_savegameController.isSaving == true or g_savegameController.savePending == true then
+            return true
+        end
+    end
+
+    return false
+end
+
 ---@return table|nil
 function SeasonalCropStressReader.getManager()
     if g_currentMission ~= nil and g_currentMission.cropStressManager ~= nil then
@@ -59,21 +76,12 @@ function SeasonalCropStressReader.lookupFieldData(fieldData, farmlandId)
     return fieldData[tostring(farmlandId)]
 end
 
-function SeasonalCropStressReader.refreshFieldData()
+--- Read-only: never call SCS buildFieldMap/enumerateFields (touches fields.xml; broke saves after audit).
+---@param _force boolean|nil ignored
+---@return boolean
+function SeasonalCropStressReader.refreshFieldData(_force)
     local manager = SeasonalCropStressReader.getManager()
-    if manager == nil or manager.soilSystem == nil then
-        return false
-    end
-
-    if manager.soilSystem.enumerateFields ~= nil then
-        pcall(manager.soilSystem.enumerateFields, manager.soilSystem)
-    end
-
-    if manager.buildFieldMap ~= nil then
-        pcall(manager.buildFieldMap, manager)
-    end
-
-    if manager.soilSystem.fieldData == nil then
+    if manager == nil or manager.soilSystem == nil or manager.soilSystem.fieldData == nil then
         return false
     end
 
@@ -90,8 +98,7 @@ function SeasonalCropStressReader.ensureInitialized()
         return false
     end
 
-    SeasonalCropStressReader.refreshFieldData()
-    return true
+    return next(manager.soilSystem.fieldData) ~= nil
 end
 
 ---@return boolean

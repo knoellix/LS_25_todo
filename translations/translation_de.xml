@@ -19,6 +19,8 @@
 
         <text name="ftdl_col_field" text="Feld"/>
         <text name="ftdl_col_fruit" text="Kultur"/>
+        <text name="ftdl_fruit_partial_grass" text="Gras (teilw. bearb.)"/>
+        <text name="ftdl_fruit_partial_fallow" text="Brache (teilw.)"/>
         <text name="ftdl_col_growth" text="St"/>
         <text name="ftdl_col_harvest" text="Ernte"/>
         <text name="ftdl_col_weed" text="Unkr"/>
@@ -74,6 +76,12 @@
 
         <text name="ftdl_action_all_ok" text="Alles ok"/>
         <text name="ftdl_action_harvest" text="Ernten"/>
+        <text name="ftdl_action_grass_mow" text="Mähen"/>
+        <text name="ftdl_action_grass_mow_short" text="Mähen"/>
+        <text name="ftdl_action_grass_swath" text="Schwaden"/>
+        <text name="ftdl_action_grass_collect" text="Einsammeln / Laden"/>
+        <text name="ftdl_action_grass_bale" text="Ballen pressen"/>
+        <text name="ftdl_action_grass_silage_bale" text="Silageballen pressen"/>
         <text name="ftdl_action_withered" text="Verdorrt"/>
         <text name="ftdl_action_stones" text="Steine"/>
         <text name="ftdl_action_cultivate" text="Grubbern"/>
@@ -123,5 +131,6 @@
         <text name="ftdl_weed_light" text="leicht"/>
         <text name="ftdl_weed_medium" text="mittel"/>
         <text name="ftdl_weed_heavy" text="stark"/>
+        <text name="ftdl_weed_dead" text="tot"/>
     </texts>
 </l10n>

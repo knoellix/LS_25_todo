@@ -4,7 +4,7 @@
 
 **Author:** Christian Möllmann ([knoellix](https://github.com/knoellix))  
 **License:** [GNU GPL v3](LICENSE)  
-**Version:** see `modDesc.xml` (currently pre-release `0.1.0.0`)
+**Version:** `0.1.0.1`
 
 ## Features
 
@@ -13,6 +13,9 @@
 - **Work order:** presets (e.g. plow → lime → sow → fertilize) and **alternating manure/slurry** for organic multi-pass spreading
 - **Field workflow:** adopt suggestions, visit field (teleport), auto-complete when the game detects the job is done
 - **List order:** ▲ / ▼ buttons to move the selected task up or down (no drag-and-drop in the Giants UI)
+- **Done behavior:** completed tasks are grouped below open tasks; newly completed go to the top of the done group; max 10 completed (oldest pruned)
+- **Selection UX:** after move, the moved task stays selected; after delete, selection is cleared
+- **Harvest hints:** field suggestion column shows month labels instead of ambiguous month counts
 - **Save data:** `fieldToDoList.xml` in the savegame folder (tasks debounced ~2 s after edits; settings saved immediately)
 
 ## Optional mods
@@ -21,7 +24,7 @@
 | Mod                                                                                       | Status                                                                                 |
 | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | FS25_precisionFarming                                                                     | Supported — pH / nitrogen columns when PF is loaded                                    |
-| [FS25_SeasonalCropStress](https://github.com/TheCodingDad-TisonK/FS25_SeasonalCropStress) | Supported — moisture / stress columns and field mapping are read at runtime            |
+| [FS25_SeasonalCropStress](https://github.com/TheCodingDad-TisonK/FS25_SeasonalCropStress) | Partial / limited — moisture and stress columns may show `-` or loading; no full runtime integration yet |
 
 
 Works fully without add-ons using base game field data.

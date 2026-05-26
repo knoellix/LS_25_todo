@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <modDesc descVersion="98">
     <author>knoellix</author>
-    <version>0.1.0.0</version>
+    <version>0.1.0.1</version>
 
     <title>
         <en>Field To-Do List</en>
@@ -20,7 +20,7 @@ Field work list and To-Dos for Farming Simulator 25.
 
 Optional: Precision Farming (pH / nitrogen columns). Seasonal Crop Stress: not fully supported yet.
 
-Version 0.1.0.0 — pre-release development.
+Version 0.1.0.1 — pre-release development.
         ]]></en>
         <de><![CDATA[
 Feld-Arbeitsliste und To-Dos für Farming Simulator 25.
@@ -33,7 +33,7 @@ Feld-Arbeitsliste und To-Dos für Farming Simulator 25.
 
 Optional: Precision Farming (pH / Stickstoff). Seasonal Crop Stress: noch nicht voll unterstützt.
 
-Version 0.1.0.0 — Vorab-Entwicklung.
+Version 0.1.0.1 — Vorab-Entwicklung.
         ]]></de>
     </description>
 
@@ -61,6 +61,9 @@ Version 0.1.0.0 — Vorab-Entwicklung.
         <sourceFile filename="scripts/SeasonalCropStressReader.lua"/>
         <sourceFile filename="scripts/FieldAdvisorSettings.lua"/>
         <sourceFile filename="scripts/FieldActionPicker.lua"/>
+        <sourceFile filename="scripts/FieldSavegameReader.lua"/>
+        <sourceFile filename="scripts/FieldTaskCompletion.lua"/>
+        <sourceFile filename="scripts/FieldWorkCatalog.lua"/>
         <sourceFile filename="scripts/FieldAdvisor.lua"/>
         <sourceFile filename="scripts/FieldScanner.lua"/>
         <sourceFile filename="scripts/FieldVisit.lua"/>

@@ -79,19 +79,37 @@ function FieldScanner:getGrowthLabel(field)
 end
 
 ---@param field table
+---@return number|nil
+function FieldScanner:getPlayerFarmId()
+    if self.mission == nil or self.mission.getFarmId == nil then
+        return nil
+    end
+
+    return self.mission:getFarmId()
+end
+
+---@param farmland table|number|nil
+---@param farmId number|nil
 ---@return boolean
-function FieldScanner:isPlayerOwnedField(field)
-    if field == nil then
+function FieldScanner:farmlandBelongsToFarm(farmland, farmId)
+    if farmland == nil or farmId == nil then
         return false
     end
 
-    if field.getHasOwner ~= nil and field:getHasOwner() then
-        return true
+    local farmlandId = type(farmland) == "table" and farmland.id or farmland
+    if farmlandId == nil then
+        return false
     end
 
-    if field.fieldState ~= nil and self.mission ~= nil and field.fieldState.ownerFarmId ~= nil then
-        local farmId = self.mission:getFarmId()
-        if farmId ~= nil and field.fieldState.ownerFarmId == farmId then
+    if type(farmland) == "table" then
+        if farmland.farmId == farmId or farmland.ownerFarmId == farmId then
+            return true
+        end
+    end
+
+    if g_farmlandManager ~= nil and g_farmlandManager.farmlands ~= nil then
+        local entry = g_farmlandManager.farmlands[farmlandId]
+        if entry ~= nil and (entry.farmId == farmId or entry.ownerFarmId == farmId) then
             return true
         end
     end
@@ -100,9 +118,65 @@ function FieldScanner:isPlayerOwnedField(field)
 end
 
 ---@param field table
+---@return boolean
+function FieldScanner:isPlayerOwnedField(field)
+    if field == nil then
+        return false
+    end
+
+    local farmId = self:getPlayerFarmId()
+    local posX, posZ = nil, nil
+    if field.getCenterOfFieldWorldPosition ~= nil then
+        posX, posZ = field:getCenterOfFieldWorldPosition()
+    end
+
+    if posX ~= nil and posZ ~= nil and field.fieldState ~= nil and field.fieldState.update ~= nil then
+        field.fieldState:update(posX, posZ)
+    end
+
+    if field.getHasOwner ~= nil then
+        local ok, hasOwner = pcall(field.getHasOwner, field)
+        if ok and hasOwner == true then
+            return true
+        end
+    end
+
+    if farmId ~= nil and field.fieldState ~= nil and field.fieldState.ownerFarmId == farmId then
+        return true
+    end
+
+    if farmId ~= nil and field.farmland ~= nil and self:farmlandBelongsToFarm(field.farmland, farmId) then
+        return true
+    end
+
+    if farmId ~= nil and posX ~= nil and posZ ~= nil and g_farmlandManager ~= nil then
+        if g_farmlandManager.getFarmlandAtWorldPosition ~= nil then
+            local ok, farmland = pcall(g_farmlandManager.getFarmlandAtWorldPosition, g_farmlandManager, posX, posZ)
+            if ok and self:farmlandBelongsToFarm(farmland, farmId) then
+                return true
+            end
+        end
+
+        if g_farmlandManager.getFarmlandIdAtWorldPosition ~= nil then
+            local ok, farmlandId = pcall(g_farmlandManager.getFarmlandIdAtWorldPosition, g_farmlandManager, posX, posZ)
+            if ok and self:farmlandBelongsToFarm(farmlandId, farmId) then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+---@param field table
+---@param forceInclude boolean|nil include even when ownership probe fails (open To-Do on this field)
 ---@return table|nil fieldRecord
-function FieldScanner:normalizeField(field)
-    if field == nil or not self:isPlayerOwnedField(field) then
+function FieldScanner:normalizeField(field, forceInclude)
+    if field == nil then
+        return nil
+    end
+
+    if forceInclude ~= true and not self:isPlayerOwnedField(field) then
         return nil
     end
 
@@ -111,10 +185,10 @@ function FieldScanner:normalizeField(field)
         field.fieldState:update(posX, posZ)
     end
 
-    local fieldState = FieldAdvisor.getFieldState(field)
+    local fieldId = field.getId ~= nil and field:getId() or 0
+    local fieldState = FieldAdvisor.getEnrichedFieldState(field, fieldId, posX, posZ)
     local labels = FieldAdvisor.buildFieldLabels(field, fieldState, posX, posZ)
 
-    local fieldId = field.getId ~= nil and field:getId() or 0
     local fieldName = field.name
     if string.isNilOrWhitespace(fieldName) then
         fieldName = string.format("Feld %d", fieldId)
@@ -200,6 +274,8 @@ function FieldScanner:scanOwnedFields()
         return fields
     end
 
+    local seenIds = {}
+
     for _, field in pairs(allFields) do
         local ok, record = pcall(function()
             return self:normalizeField(field)
@@ -207,6 +283,28 @@ function FieldScanner:scanOwnedFields()
 
         if ok and record ~= nil then
             table.insert(fields, record)
+            seenIds[record.id] = true
+        end
+    end
+
+    if g_currentMission ~= nil and g_currentMission.fieldToDoList ~= nil then
+        local manager = g_currentMission.fieldToDoList
+        if manager.manualTasks ~= nil and manager.fieldScanner == self then
+            for _, task in pairs(manager.manualTasks) do
+                local fieldId = tonumber(task.fieldId)
+                if fieldId ~= nil and not seenIds[fieldId] and not task.completed then
+                    local engineField = self:getEngineFieldById(fieldId)
+                    if engineField ~= nil then
+                        local ok, record = pcall(function()
+                            return self:normalizeField(engineField, true)
+                        end)
+                        if ok and record ~= nil then
+                            table.insert(fields, record)
+                            seenIds[record.id] = true
+                        end
+                    end
+                end
+            end
         end
     end
 

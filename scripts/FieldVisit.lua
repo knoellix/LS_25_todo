@@ -92,14 +92,112 @@ function FieldVisit.getTerrainY(x, z)
     return y + FieldVisit.TELEPORT_HEIGHT_OFFSET
 end
 
+---@return table|nil
+function FieldVisit.getControlledVehicle()
+    local mission = g_currentMission
+    local player = g_localPlayer
+    if player == nil and mission ~= nil then
+        player = mission.player
+    end
+
+    if player ~= nil then
+        if player.getCurrentVehicle ~= nil then
+            local ok, vehicle = pcall(player.getCurrentVehicle, player)
+            if ok and vehicle ~= nil then
+                return vehicle
+            end
+        end
+
+        if player.getControlledVehicle ~= nil then
+            local ok, vehicle = pcall(player.getControlledVehicle, player)
+            if ok and vehicle ~= nil then
+                return vehicle
+            end
+        end
+
+        if player.rootNode ~= nil and player.rootNode ~= 0 and getParent ~= nil then
+            local ok, parent = pcall(getParent, player.rootNode)
+            if ok and parent ~= nil and parent ~= 0 and g_currentMission ~= nil and g_currentMission.vehicleSystem ~= nil then
+                local vehicles = g_currentMission.vehicleSystem.vehicles
+                if vehicles ~= nil then
+                    for _, vehicle in pairs(vehicles) do
+                        if vehicle ~= nil and vehicle.rootNode == parent then
+                            return vehicle
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if mission ~= nil and mission.controlledVehicle ~= nil then
+        return mission.controlledVehicle
+    end
+
+    return nil
+end
+
+function FieldVisit.exitVehicleIfNeeded()
+    local mission = g_currentMission
+    if mission == nil then
+        return
+    end
+
+    local vehicle = FieldVisit.getControlledVehicle()
+    if vehicle == nil then
+        return
+    end
+
+    local exitCalls = {
+        function()
+            if mission.removeVehicleFromUser ~= nil then
+                mission:removeVehicleFromUser(vehicle)
+            end
+        end,
+        function()
+            if mission.leaveVehicle ~= nil then
+                mission:leaveVehicle()
+            end
+        end,
+        function()
+            if mission.tryExitVehicle ~= nil then
+                mission:tryExitVehicle()
+            end
+        end,
+        function()
+            if mission.interruptPlayer ~= nil then
+                mission:interruptPlayer()
+            end
+        end,
+        function()
+            local player = g_localPlayer or mission.player
+            if player ~= nil and player.leaveVehicle ~= nil then
+                player:leaveVehicle()
+            end
+        end,
+        function()
+            if vehicle.exitControlledObject ~= nil then
+                vehicle:exitControlledObject()
+            end
+        end,
+        function()
+            if vehicle.onLeaveVehicle ~= nil then
+                vehicle:onLeaveVehicle()
+            end
+        end,
+    }
+
+    for _, exitCall in ipairs(exitCalls) do
+        pcall(exitCall)
+    end
+end
+
 ---@param x number
 ---@param y number
 ---@param z number
 ---@return boolean
 function FieldVisit.teleportPlayerTo(x, y, z)
-    if g_currentMission ~= nil and g_currentMission.tryExitVehicle ~= nil then
-        pcall(g_currentMission.tryExitVehicle, g_currentMission)
-    end
+    FieldVisit.exitVehicleIfNeeded()
 
     local player = g_localPlayer
     if player == nil and g_currentMission ~= nil then
@@ -162,6 +260,8 @@ function FieldVisit.visitField(field, scanner)
     if g_gui ~= nil and g_gui.showGui ~= nil then
         pcall(g_gui.showGui, g_gui, "")
     end
+
+    FieldVisit.exitVehicleIfNeeded()
 
     if not FieldVisit.teleportPlayerTo(x, y, z) then
         return false, "teleport_failed"

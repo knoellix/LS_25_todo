@@ -20,10 +20,32 @@ FieldAdvisor.GRASS_FRUIT_NAMES = {
     MEADOW = true,
     PASTURE = true,
     GREENRYE = true,
+    FIELDGRASS = true,
+    ALFALFA = true,
+    CLOVER = true,
+    LUCERNE = true,
+    MEDICK = true,
 }
 
-FieldAdvisor.JOB_COMPLETION_THRESHOLD = 0.98
-FieldAdvisor.JOB_SAMPLE_GRID_STEPS = 2
+FieldAdvisor.JOB_COMPLETION_THRESHOLD = FieldTaskCompletion ~= nil
+    and FieldTaskCompletion.COMPLETION_THRESHOLD
+    or 0.98
+FieldAdvisor.JOB_SAMPLE_GRID_STEPS = FieldTaskCompletion ~= nil
+    and FieldTaskCompletion.SAMPLE_GRID_STEPS
+    or 5
+FieldAdvisor.WEED_FACTOR_COMBAT_THRESHOLD = 0.05
+FieldAdvisor.WEED_FACTOR_COMPLETE_THRESHOLD = 0.02
+-- FS25 save/field state: high weed levels are dead/sprayed weeds on the map (brown), not live weeds.
+FieldAdvisor.WEED_STATE_DEAD_MIN = 7
+
+FieldAdvisor.SOIL_WORK_GROUND_TYPES = {
+    "CULTIVATED",
+    "SEEDBED",
+    "PLOWED",
+    "SOWN",
+    "PLANTED",
+    "RIDGE_SOWN",
+}
 
 ---@param value any
 ---@return number
@@ -77,6 +99,195 @@ function FieldAdvisor.getStateBool(fieldState, key)
     end
 
     return fieldState[key] == true
+end
+
+FieldAdvisor.groundTypeNameByValue = nil
+
+---@param raw any
+---@return string
+function FieldAdvisor.resolveGroundTypeName(raw)
+    if raw == nil then
+        return ""
+    end
+
+    if type(raw) == "string" then
+        local name = string.upper(raw)
+        if name ~= "" and not string.match(name, "^%d+$") then
+            return name
+        end
+    end
+
+    local value = tonumber(raw)
+    if value == nil then
+        return ""
+    end
+
+    if value == 0 then
+        return "NONE"
+    end
+
+    if FieldGroundType ~= nil then
+        if FieldAdvisor.groundTypeNameByValue == nil then
+            FieldAdvisor.groundTypeNameByValue = {}
+
+            for name, enumValue in pairs(FieldGroundType) do
+                if type(name) == "string" and type(enumValue) == "number" then
+                    FieldAdvisor.groundTypeNameByValue[enumValue] = name
+                elseif type(enumValue) == "string" and FieldGroundType.getValueByType ~= nil then
+                    local ok, resolvedValue = pcall(FieldGroundType.getValueByType, FieldGroundType, enumValue)
+                    if ok and resolvedValue ~= nil then
+                        FieldAdvisor.groundTypeNameByValue[resolvedValue] = enumValue
+                    end
+                end
+            end
+        end
+
+        local resolvedName = FieldAdvisor.groundTypeNameByValue[value]
+        if resolvedName ~= nil then
+            return resolvedName
+        end
+    end
+
+    return ""
+end
+
+---@param fieldState table|nil
+---@return string
+function FieldAdvisor.getGroundTypeName(fieldState)
+    if fieldState == nil then
+        return ""
+    end
+
+    local raw = fieldState.groundType
+    if raw == nil and type(fieldState.getGroundType) == "function" then
+        local ok, groundType = pcall(fieldState.getGroundType, fieldState)
+        if ok then
+            raw = groundType
+        end
+    end
+
+    return FieldAdvisor.resolveGroundTypeName(raw)
+end
+
+---@param groundType string
+---@param candidates string[]
+---@return boolean
+function FieldAdvisor.groundTypeIsOneOf(groundType, candidates)
+    for _, candidate in ipairs(candidates) do
+        if groundType == candidate then
+            return true
+        end
+    end
+
+    return false
+end
+
+---@param fruitName string|nil
+---@return number|nil
+function FieldAdvisor.getFruitTypeIndexByName(fruitName)
+    if string.isNilOrWhitespace(fruitName) or g_fruitTypeManager == nil then
+        return nil
+    end
+
+    if g_fruitTypeManager.getFruitTypeIndexByName ~= nil then
+        local ok, fruitTypeIndex = pcall(g_fruitTypeManager.getFruitTypeIndexByName, g_fruitTypeManager, fruitName)
+        if ok and fruitTypeIndex ~= nil and fruitTypeIndex > 0 then
+            return fruitTypeIndex
+        end
+    end
+
+    if g_fruitTypeManager.getFruitTypes ~= nil then
+        local ok, fruitTypes = pcall(g_fruitTypeManager.getFruitTypes, g_fruitTypeManager)
+        if ok and fruitTypes ~= nil then
+            for _, fruitDesc in ipairs(fruitTypes) do
+                if fruitDesc ~= nil and fruitDesc.name == fruitName and fruitDesc.index ~= nil and fruitDesc.index > 0 then
+                    return fruitDesc.index
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+---@param fieldState table|nil
+---@return number|nil
+function FieldAdvisor.resolveFruitTypeIndex(fieldState)
+    local fruitTypeIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
+    if fruitTypeIndex ~= nil and fruitTypeIndex > 0 then
+        if FruitType == nil or fruitTypeIndex ~= FruitType.UNKNOWN then
+            return fruitTypeIndex
+        end
+    end
+
+    if fieldState ~= nil then
+        if fieldState.plannedFruit ~= nil then
+            fruitTypeIndex = FieldAdvisor.getFruitTypeIndexByName(fieldState.plannedFruit)
+            if fruitTypeIndex ~= nil then
+                return fruitTypeIndex
+            end
+        end
+
+        if fieldState.fruitType ~= nil and fieldState.fruitType ~= "UNKNOWN" then
+            fruitTypeIndex = FieldAdvisor.getFruitTypeIndexByName(fieldState.fruitType)
+            if fruitTypeIndex ~= nil then
+                return fruitTypeIndex
+            end
+        end
+    end
+
+    return nil
+end
+
+---@param field table|nil
+---@param fieldId number|nil
+---@param worldX number|nil
+---@param worldZ number|nil
+---@return table|nil
+function FieldAdvisor.getEnrichedFieldState(field, fieldId, worldX, worldZ)
+    local fieldState = FieldAdvisor.getFieldState(field)
+    if fieldState ~= nil and fieldState.update ~= nil and worldX ~= nil and worldZ ~= nil then
+        fieldState:update(worldX, worldZ)
+    end
+
+    local saveAttrs = FieldSavegameReader ~= nil and FieldSavegameReader.getFieldAttributes(fieldId) or nil
+    if saveAttrs == nil then
+        return fieldState
+    end
+
+    if fieldState == nil then
+        fieldState = {}
+    end
+
+    if fieldState.plannedFruit == nil and saveAttrs.plannedFruit ~= nil then
+        fieldState.plannedFruit = saveAttrs.plannedFruit
+    end
+
+    if fieldState.fruitType == nil and saveAttrs.fruitType ~= nil then
+        fieldState.fruitType = saveAttrs.fruitType
+    end
+
+    local engineFruitIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
+    if (engineFruitIndex == nil or (FruitType ~= nil and engineFruitIndex == FruitType.UNKNOWN))
+        and saveAttrs.fruitType ~= nil
+        and saveAttrs.fruitType ~= "UNKNOWN" then
+        fieldState.fruitTypeName = saveAttrs.fruitType
+    end
+
+    local groundTypeName = FieldAdvisor.getGroundTypeName(fieldState)
+    if saveAttrs.groundType ~= nil
+        and saveAttrs.groundType ~= "NONE"
+        and (groundTypeName == "" or groundTypeName == "NONE") then
+        fieldState.groundType = saveAttrs.groundType
+    end
+
+    -- Never overlay save weedState: stale values keep "spray weeds" after spraying (dead weeds stay weedState 8–9).
+
+    if FieldAdvisor.getLastGrowthState(fieldState) <= 0 and (saveAttrs.lastGrowthState or 0) > 0 then
+        fieldState.lastGrowthState = saveAttrs.lastGrowthState
+    end
+
+    return fieldState
 end
 
 ---@param level number
@@ -140,6 +351,168 @@ function FieldAdvisor.formatWeedLabel(weedState, rules)
     return label
 end
 
+---@param fieldState table|nil
+---@return number
+function FieldAdvisor.getWeedFactor(fieldState)
+    return FieldAdvisor.getStateNumber(fieldState, "weedFactor")
+end
+
+---@param fieldState table|nil
+---@return number
+function FieldAdvisor.getWeedStateLevel(fieldState)
+    return FieldAdvisor.getStateNumber(fieldState, "weedState")
+end
+
+---@param fieldState table|nil
+---@return boolean
+function FieldAdvisor.hasWeedFactorReading(fieldState)
+    return fieldState ~= nil and fieldState.weedFactor ~= nil
+end
+
+---@param fieldState table|nil
+---@return boolean
+function FieldAdvisor.isWeedDeadOrSprayed(fieldState)
+    if fieldState == nil then
+        return false
+    end
+
+    if FieldAdvisor.getWeedStateLevel(fieldState) >= FieldAdvisor.WEED_STATE_DEAD_MIN then
+        return true
+    end
+
+    if FieldAdvisor.hasWeedFactorReading(fieldState) then
+        return FieldAdvisor.getWeedFactor(fieldState) <= FieldAdvisor.WEED_FACTOR_COMPLETE_THRESHOLD
+    end
+
+    return FieldAdvisor.getWeedStateLevel(fieldState) <= 0
+end
+
+---@param fieldState table|nil
+---@return number
+function FieldAdvisor.getEffectiveWeedPressure(fieldState)
+    if FieldAdvisor.isWeedDeadOrSprayed(fieldState) then
+        return 0
+    end
+
+    if FieldAdvisor.hasWeedFactorReading(fieldState) then
+        return FieldAdvisor.getWeedFactor(fieldState)
+    end
+
+    local weedState = FieldAdvisor.getWeedStateLevel(fieldState)
+    if weedState <= 0 then
+        return 0
+    end
+
+    return math.min(1, weedState / 9)
+end
+
+---@param fieldState table|nil
+---@param rules table
+---@return string
+function FieldAdvisor.formatWeedDisplayLabel(fieldState, rules)
+    if not rules.weedsEnabled then
+        return FieldAdvisor.formatWeedLabel(FieldAdvisor.getWeedStateLevel(fieldState), rules)
+    end
+
+    if FieldAdvisor.isWeedDeadOrSprayed(fieldState) then
+        return FieldAdvisor.text("ftdl_weed_dead", "tot")
+    end
+
+    local pressure = FieldAdvisor.getEffectiveWeedPressure(fieldState)
+    if pressure > 0.001 then
+        local percent = math.floor(pressure * 100 + 0.5)
+        if percent <= 2 then
+            return FieldAdvisor.text("ftdl_val_none", "kein")
+        end
+
+        return string.format("%d%%", percent)
+    end
+
+    return FieldAdvisor.formatWeedLabel(FieldAdvisor.getWeedStateLevel(fieldState), rules)
+end
+
+---@param fieldState table|nil
+---@param rules table
+---@return boolean
+function FieldAdvisor.fieldNeedsWeedCombat(fieldState, rules)
+    if not rules.weedsEnabled or FieldAdvisor.isWeedDeadOrSprayed(fieldState) then
+        return false
+    end
+
+    return FieldAdvisor.getEffectiveWeedPressure(fieldState) >= FieldAdvisor.WEED_FACTOR_COMBAT_THRESHOLD
+end
+
+---@param fieldState table|nil
+---@param rules table
+---@return boolean
+function FieldAdvisor.fieldNeedsWeedWatch(fieldState, rules)
+    if not rules.weedsEnabled or FieldAdvisor.isWeedDeadOrSprayed(fieldState) then
+        return false
+    end
+
+    if FieldAdvisor.fieldNeedsWeedCombat(fieldState, rules) then
+        return false
+    end
+
+    local pressure = FieldAdvisor.getEffectiveWeedPressure(fieldState)
+    return pressure > FieldAdvisor.WEED_FACTOR_COMPLETE_THRESHOLD
+        and pressure < FieldAdvisor.WEED_FACTOR_COMBAT_THRESHOLD
+end
+
+---@param period number
+---@return string
+function FieldAdvisor.getEnvironmentPeriodLabel(period)
+    if g_currentMission ~= nil and g_currentMission.environment ~= nil then
+        local environment = g_currentMission.environment
+
+        if environment.getPeriodName ~= nil then
+            local ok, periodName = pcall(environment.getPeriodName, environment, period)
+            if ok and not string.isNilOrWhitespace(periodName) then
+                return periodName
+            end
+        end
+
+        if environment.periodNames ~= nil and environment.periodNames[period] ~= nil then
+            return tostring(environment.periodNames[period])
+        end
+    end
+
+    return PrecisionFarmingReader.getMonthName(period)
+end
+
+---@param fruitDesc table|nil
+---@return string|nil
+function FieldAdvisor.collectHarvestablePeriodLabels(fruitDesc)
+    if fruitDesc == nil or fruitDesc.getIsHarvestableInPeriod == nil then
+        return nil
+    end
+
+    local labels = {}
+    local maxPeriod = 12
+
+    if g_currentMission ~= nil and g_currentMission.environment ~= nil then
+        local environment = g_currentMission.environment
+        if environment.periodsPerYear ~= nil then
+            maxPeriod = math.max(1, math.floor(tonumber(environment.periodsPerYear) or 12))
+        end
+    end
+
+    for period = 1, maxPeriod do
+        local ok, harvestable = pcall(fruitDesc.getIsHarvestableInPeriod, fruitDesc, period)
+        if ok and harvestable == true then
+            labels[#labels + 1] = FieldAdvisor.getEnvironmentPeriodLabel(period)
+        end
+    end
+
+    if #labels == 0 then
+        return nil
+    end
+
+    -- Prefer the first harvestable period label. Showing a pure count ("11 Mon.") reads like
+    -- "wait 11 months", which is misleading; the list describes the harvest window across the year.
+    return labels[1]
+end
+
 ---@param rollerLevel number
 ---@param needsRolling boolean
 ---@return string
@@ -184,7 +557,7 @@ function FieldAdvisor.isHarvestReady(field, fieldState)
         end
     end
 
-    if field.groundType == "HARVEST_READY" then
+    if field ~= nil and field.groundType == "HARVEST_READY" then
         return true
     end
 
@@ -312,14 +685,125 @@ function FieldAdvisor.getLocalizedFruitTitle(fruitTypeIndex)
 end
 
 ---@param fruitTypeIndex number|nil
+---@return table|nil
+function FieldAdvisor.getFruitTypeDesc(fruitTypeIndex)
+    if fruitTypeIndex == nil or fruitTypeIndex <= 0 or g_fruitTypeManager == nil then
+        return nil
+    end
+
+    return g_fruitTypeManager:getFruitTypeByIndex(fruitTypeIndex)
+end
+
+---@param fruitTypeIndex number|nil
 ---@return boolean
 function FieldAdvisor.isGrassCrop(fruitTypeIndex)
     local fruitName = FieldAdvisor.getFruitTypeName(fruitTypeIndex)
-    if fruitName == nil then
+    if fruitName ~= nil and FieldAdvisor.GRASS_FRUIT_NAMES[string.upper(fruitName)] == true then
+        return true
+    end
+
+    local fruitDesc = FieldAdvisor.getFruitTypeDesc(fruitTypeIndex)
+    if fruitDesc == nil then
         return false
     end
 
-    return FieldAdvisor.GRASS_FRUIT_NAMES[string.upper(fruitName)] == true
+    for _, flagName in ipairs({ "isGrassland", "isGrass", "isGrassCrop" }) do
+        if fruitDesc[flagName] == true then
+            return true
+        end
+    end
+
+    if fruitDesc.getNeedsPlowing ~= nil then
+        local ok, needsPlowing = pcall(fruitDesc.getNeedsPlowing, fruitDesc)
+        if ok and needsPlowing == false and fruitDesc.minHarvestingGrowthState ~= nil then
+            local minHarvest = tonumber(fruitDesc.minHarvestingGrowthState) or 0
+            local maxHarvest = tonumber(fruitDesc.maxHarvestingGrowthState) or 0
+            if maxHarvest > minHarvest and minHarvest >= 0 then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+---@param fieldState table|nil
+---@return boolean
+function FieldAdvisor.isGrassHarvestable(fieldState)
+    local fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState)
+    if not FieldAdvisor.isGrassCrop(fruitTypeIndex) then
+        return false
+    end
+
+    if FieldAdvisor.isHarvestReady(nil, fieldState) then
+        return true
+    end
+
+    local growthState = FieldAdvisor.getGrowthState(fieldState)
+    local fruitDesc = FieldAdvisor.getFruitTypeDesc(fruitTypeIndex)
+    if fruitDesc == nil or fruitDesc.getIsHarvestable == nil then
+        return false
+    end
+
+    local ok, isHarvestable = pcall(fruitDesc.getIsHarvestable, fruitDesc, growthState)
+    return ok and isHarvestable == true
+end
+
+---@param fieldState table|nil
+---@return boolean
+function FieldAdvisor.isGrassCut(fieldState)
+    local fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState)
+    if not FieldAdvisor.isGrassCrop(fruitTypeIndex) then
+        return false
+    end
+
+    local growthState = FieldAdvisor.getGrowthState(fieldState)
+    local fruitDesc = FieldAdvisor.getFruitTypeDesc(fruitTypeIndex)
+    if fruitDesc == nil or fruitDesc.getIsCut == nil then
+        return false
+    end
+
+    local ok, isCut = pcall(fruitDesc.getIsCut, fruitDesc, growthState)
+    return ok and isCut == true
+end
+
+---@param fieldState table|nil
+---@return number
+function FieldAdvisor.getLastGrowthState(fieldState)
+    return FieldAdvisor.getStateNumber(fieldState, "lastGrowthState")
+end
+
+---@param fieldState table|nil
+---@param baseline table|nil
+---@return boolean
+function FieldAdvisor.isGrassPostCutCleared(fieldState, baseline)
+    if fieldState == nil or baseline == nil then
+        return false
+    end
+
+    if FieldAdvisor.isGrassCut(fieldState) or FieldAdvisor.isGrassHarvestable(fieldState) then
+        return false
+    end
+
+    if baseline.wasGrassCut == true and FieldAdvisor.getGrowthState(fieldState) <= 0 then
+        return true
+    end
+
+    local fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState)
+    local fruitDesc = FieldAdvisor.getFruitTypeDesc(fruitTypeIndex)
+    if fruitDesc ~= nil and fruitDesc.getIsGrowing ~= nil then
+        local ok, isGrowing = pcall(fruitDesc.getIsGrowing, fruitDesc, FieldAdvisor.getGrowthState(fieldState))
+        if ok and isGrowing == true and baseline.wasGrassCut == true then
+            return true
+        end
+    end
+
+    if baseline.wasGrassCut == true
+        and FieldAdvisor.getLastGrowthState(fieldState) ~= (baseline.lastGrowthState or -1) then
+        return true
+    end
+
+    return false
 end
 
 ---@param fieldState table|nil
@@ -349,22 +833,68 @@ end
 ---@param fieldState table|nil
 ---@return boolean
 function FieldAdvisor.isFieldUnsown(fieldState)
-    local fruitTypeIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
-    if fruitTypeIndex == nil then
+    if fieldState == nil then
         return true
+    end
+
+    local growthState = FieldAdvisor.getGrowthState(fieldState)
+    local groundType = FieldAdvisor.getGroundTypeName(fieldState)
+    local fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState)
+
+    if FieldAdvisor.groundTypeIsOneOf(groundType, { "SOWN", "PLANTED", "RIDGE_SOWN", "ROLLER_LINES" }) then
+        return growthState <= 0
+    end
+
+    if fruitTypeIndex == nil then
+        return growthState <= 0
     end
 
     if FruitType ~= nil and fruitTypeIndex == FruitType.UNKNOWN then
+        return growthState <= 0
+            and not FieldAdvisor.groundTypeIsOneOf(groundType, { "CULTIVATED", "PLOWED", "SEEDBED" })
+    end
+
+    return growthState <= 0
+end
+
+---@param fieldState table|nil
+---@return boolean
+function FieldAdvisor.isFieldSown(fieldState)
+    if fieldState == nil then
+        return false
+    end
+
+    local growthState = FieldAdvisor.getGrowthState(fieldState)
+    local groundType = FieldAdvisor.getGroundTypeName(fieldState)
+
+    if FieldAdvisor.groundTypeIsOneOf(groundType, { "SOWN", "PLANTED", "RIDGE_SOWN" }) then
         return true
     end
 
-    return FieldAdvisor.getGrowthState(fieldState) <= 0
+    if growthState > 0 and FieldAdvisor.resolveFruitTypeIndex(fieldState) ~= nil then
+        return true
+    end
+
+    return FieldAdvisor.hasActiveCrop(fieldState)
 end
 
 ---@param fieldState table|nil
 ---@return boolean
 function FieldAdvisor.hasActiveCrop(fieldState)
-    if FieldAdvisor.isFieldUnsown(fieldState) then
+    if fieldState == nil then
+        return false
+    end
+
+    if FieldAdvisor.isFieldSown(fieldState) then
+        return true
+    end
+
+    local fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState)
+    if fruitTypeIndex == nil then
+        return false
+    end
+
+    if FruitType ~= nil and fruitTypeIndex == FruitType.UNKNOWN then
         return false
     end
 
@@ -441,11 +971,86 @@ function FieldAdvisor.isPostHarvestSoilWorkPhase(field, fieldState)
     return true
 end
 
+---@param field table|nil
+---@param fieldId number|nil
+---@param fieldState table|nil
+---@param worldX number|nil
+---@param worldZ number|nil
+---@return boolean
+function FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState, worldX, worldZ)
+    if field == nil or fieldState == nil then
+        return false
+    end
+
+    if worldX == nil or worldZ == nil then
+        if field.getCenterOfFieldWorldPosition ~= nil then
+            worldX, worldZ = field:getCenterOfFieldWorldPosition()
+        end
+    end
+
+    if worldX == nil or worldZ == nil then
+        return false
+    end
+
+    local centerIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState)
+    local centerGrass = FieldAdvisor.isGrassCrop(centerIndex)
+        or FieldAdvisor.getGroundTypeName(fieldState) == "GRASS"
+
+    if not centerGrass then
+        return false
+    end
+
+    local points = {}
+    if FieldTaskCompletion ~= nil and FieldTaskCompletion.collectSamplePoints ~= nil then
+        points = FieldTaskCompletion.collectSamplePoints(field, worldX, worldZ)
+    else
+        points[#points + 1] = { x = worldX, z = worldZ }
+    end
+
+    for _, point in ipairs(points) do
+        local sampleState = FieldAdvisor.getEnrichedFieldState(field, fieldId, point.x, point.z)
+        local groundType = FieldAdvisor.getGroundTypeName(sampleState)
+        if FieldAdvisor.groundTypeIsOneOf(groundType, FieldAdvisor.SOIL_WORK_GROUND_TYPES) then
+            return true
+        end
+    end
+
+    return false
+end
+
+---@param field table|nil
+---@param fieldId number|nil
+---@param fieldState table|nil
+---@param worldX number|nil
+---@param worldZ number|nil
+---@return string
+function FieldAdvisor.getFieldFruitDisplayLabel(field, fieldId, fieldState, worldX, worldZ)
+    local fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState)
+    local centerLabel = FieldAdvisor.getLocalizedFruitTitle(fruitTypeIndex)
+
+    if not FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState, worldX, worldZ) then
+        return centerLabel
+    end
+
+    local planned = fieldState ~= nil and fieldState.plannedFruit or nil
+    if planned == "FALLOW" then
+        return FieldAdvisor.text("ftdl_fruit_partial_fallow", "Brache (teilw.)")
+    end
+
+    return FieldAdvisor.text("ftdl_fruit_partial_grass", "Gras (teilw. bearb.)")
+end
+
 ---@param field table
 ---@param fieldState table|nil
 ---@return string
 function FieldAdvisor.getCropPhase(field, fieldState)
-    if FieldAdvisor.isHarvestReady(field, fieldState) then
+    local fieldId = field.getId ~= nil and field:getId() or nil
+
+    if FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState) then
+        return "empty"
+    end
+
+    if FieldAdvisor.isHarvestReady(field, fieldState) or FieldAdvisor.isGrassHarvestable(fieldState) then
         return "harvest_ready"
     end
 
@@ -476,6 +1081,10 @@ function FieldAdvisor.getExpectedHarvestLabel(field, fieldState)
         return FieldAdvisor.text("ftdl_action_withered", "Verdorrt")
     end
 
+    if FieldAdvisor.isGrassHarvestable(fieldState) then
+        return FieldAdvisor.text("ftdl_action_grass_mow_short", "Mähen")
+    end
+
     if FieldAdvisor.isHarvestReady(field, fieldState) then
         return FieldAdvisor.text(
             "ftdl_action_harvest_now_short",
@@ -484,7 +1093,7 @@ function FieldAdvisor.getExpectedHarvestLabel(field, fieldState)
         )
     end
 
-    local fruitTypeIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
+    local fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState)
     local harvestWindow = FieldAdvisor.getHarvestWindowHint(fruitTypeIndex)
     if harvestWindow ~= "-" then
         return harvestWindow
@@ -514,17 +1123,21 @@ function FieldAdvisor.getHarvestWindowHint(fruitTypeIndex)
     end
 
     if fruitDesc.harvestMonths ~= nil and type(fruitDesc.harvestMonths) == "table" and #fruitDesc.harvestMonths > 0 then
-        local parts = {}
-        for _, monthIndex in ipairs(fruitDesc.harvestMonths) do
-            local monthLabel = PrecisionFarmingReader.getMonthName(monthIndex)
-            parts[#parts + 1] = monthLabel
-        end
-
-        return table.concat(parts, "-")
+        -- Show the first month in the harvest window (short, stable label).
+        local first = fruitDesc.harvestMonths[1]
+        return PrecisionFarmingReader.getMonthName(first)
     end
 
     if fruitDesc.harvestMonthIndices ~= nil and type(fruitDesc.harvestMonthIndices) == "table" then
-        return FieldAdvisor.text("ftdl_val_month_count", "%d Mon.", #fruitDesc.harvestMonthIndices)
+        local first = fruitDesc.harvestMonthIndices[1]
+        if first ~= nil then
+            return PrecisionFarmingReader.getMonthName(first)
+        end
+    end
+
+    local periodLabels = FieldAdvisor.collectHarvestablePeriodLabels(fruitDesc)
+    if periodLabels ~= nil then
+        return periodLabels
     end
 
     return "-"
@@ -544,7 +1157,7 @@ function FieldAdvisor.buildFieldContext(field, fieldState, worldX, worldZ)
     end
 
     local scsSample = nil
-    if SeasonalCropStressReader.isModLoaded() then
+    if SeasonalCropStressReader.isRuntimeReady ~= nil and SeasonalCropStressReader.isRuntimeReady() then
         scsSample = SeasonalCropStressReader.sampleField(field)
     end
 
@@ -560,6 +1173,7 @@ function FieldAdvisor.buildFieldContext(field, fieldState, worldX, worldZ)
         plowLevel = FieldAdvisor.getStateNumber(fieldState, "plowLevel"),
         limeLevel = FieldAdvisor.getStateNumber(fieldState, "limeLevel"),
         weedState = FieldAdvisor.getStateNumber(fieldState, "weedState"),
+        weedFactor = FieldAdvisor.getWeedFactor(fieldState),
         stoneLevel = FieldAdvisor.getStateNumber(fieldState, "stoneLevel"),
         rollerLevel = FieldAdvisor.getStateNumber(fieldState, "rollerLevel"),
     }
@@ -690,6 +1304,11 @@ function FieldAdvisor.isOrganicInterleavePrefixSoil(action)
         or actionType == "harvest_info"
         or actionType == "growing"
         or actionType == "withered"
+        or actionType == "grass_mow"
+        or actionType == "grass_swath"
+        or actionType == "grass_collect"
+        or actionType == "grass_bale"
+        or actionType == "grass_silage_bale"
         or actionType == "scs_moisture"
         or actionType == "scs_stress_high"
         or actionType == "scs_stress_watch"
@@ -799,6 +1418,47 @@ function FieldAdvisor.finishActionCandidates(actions, pfSample)
     return FieldAdvisorSettings.sortActions(actions)
 end
 
+---@param actions table[]
+---@param fieldState table|nil
+function FieldAdvisor.addGrassWorkActions(actions, fieldState)
+    if FieldAdvisor.isGrassHarvestable(fieldState) then
+        FieldAdvisor_addAction(actions, {
+            actionType = "grass_mow",
+            label = FieldAdvisor.text("ftdl_action_grass_mow", "Mähen"),
+            pickerLabel = FieldAdvisor.text("ftdl_action_grass_mow", "Mähen"),
+            autoComplete = true,
+        })
+        return
+    end
+
+    if FieldAdvisor.isGrassCut(fieldState) then
+        FieldAdvisor_addAction(actions, {
+            actionType = "grass_swath",
+            label = FieldAdvisor.text("ftdl_action_grass_swath", "Schwaden"),
+            pickerLabel = FieldAdvisor.text("ftdl_action_grass_swath", "Schwaden"),
+            autoComplete = true,
+        })
+        FieldAdvisor_addAction(actions, {
+            actionType = "grass_collect",
+            label = FieldAdvisor.text("ftdl_action_grass_collect", "Einsammeln / Laden"),
+            pickerLabel = FieldAdvisor.text("ftdl_action_grass_collect", "Einsammeln / Laden"),
+            autoComplete = true,
+        })
+        FieldAdvisor_addAction(actions, {
+            actionType = "grass_bale",
+            label = FieldAdvisor.text("ftdl_action_grass_bale", "Ballen pressen"),
+            pickerLabel = FieldAdvisor.text("ftdl_action_grass_bale", "Ballen pressen"),
+            autoComplete = false,
+        })
+        FieldAdvisor_addAction(actions, {
+            actionType = "grass_silage_bale",
+            label = FieldAdvisor.text("ftdl_action_grass_silage_bale", "Silageballen pressen"),
+            pickerLabel = FieldAdvisor.text("ftdl_action_grass_silage_bale", "Silageballen pressen"),
+            autoComplete = false,
+        })
+    end
+end
+
 ---@param field table
 ---@param fieldState table|nil
 ---@param pfSample table|nil
@@ -809,7 +1469,7 @@ function FieldAdvisor.resolveActionCandidates(field, fieldState, pfSample, scsSa
     rules = rules or FieldGameRules.get()
     local actions = {}
 
-    local fruitTypeIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
+    local fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState)
     local isGrass = FieldAdvisor.isGrassCrop(fruitTypeIndex)
     local cropPhase = FieldAdvisor.getCropPhase(field, fieldState)
     local growthState = FieldAdvisor.getGrowthState(fieldState)
@@ -825,15 +1485,19 @@ function FieldAdvisor.resolveActionCandidates(field, fieldState, pfSample, scsSa
     local rollerLevel = FieldAdvisor.getStateNumber(fieldState, "rollerLevel")
 
     if cropPhase == "harvest_ready" then
-        FieldAdvisor_addAction(actions, {
-            actionType = "harvest",
-            label = FieldAdvisor.text(
-                "ftdl_action_harvest_now",
-                "Jetzt ernten (%s)",
-                PrecisionFarmingReader.getCurrentMonthLabel()
-            ),
-            autoComplete = true,
-        })
+        if isGrass then
+            FieldAdvisor.addGrassWorkActions(actions, fieldState)
+        else
+            FieldAdvisor_addAction(actions, {
+                actionType = "harvest",
+                label = FieldAdvisor.text(
+                    "ftdl_action_harvest_now",
+                    "Jetzt ernten (%s)",
+                    PrecisionFarmingReader.getCurrentMonthLabel()
+                ),
+                autoComplete = true,
+            })
+        end
     end
 
     if cropPhase == "withered" then
@@ -890,13 +1554,17 @@ function FieldAdvisor.resolveActionCandidates(field, fieldState, pfSample, scsSa
     end
 
     if cropPhase == "growing" then
-        if rules.weedsEnabled and weedState >= 3 then
+        if isGrass then
+            FieldAdvisor.addGrassWorkActions(actions, fieldState)
+        end
+
+        if FieldAdvisor.fieldNeedsWeedCombat(fieldState, rules) then
             FieldAdvisor_addAction(actions, {
                 actionType = "weed_combat",
                 label = FieldAdvisor.text("ftdl_action_weed_combat_long", "Unkraut bekämpfen"),
                 autoComplete = true,
             })
-        elseif rules.weedsEnabled and weedState > 0 then
+        elseif FieldAdvisor.fieldNeedsWeedWatch(fieldState, rules) then
             FieldAdvisor_addAction(actions, {
                 actionType = "weed_watch",
                 label = FieldAdvisor.text("ftdl_action_weed_watch_long", "Unkraut beobachten"),
@@ -937,7 +1605,10 @@ function FieldAdvisor.resolveActionCandidates(field, fieldState, pfSample, scsSa
             })
         end
 
-        if scsSample ~= nil and scsSample.moisture ~= nil and scsSample.moisture < 0.25 then
+        if SeasonalCropStressReader.isRuntimeReady()
+            and scsSample ~= nil
+            and scsSample.moisture ~= nil
+            and scsSample.moisture < 0.25 then
             FieldAdvisor_addAction(actions, {
                 actionType = "scs_moisture",
                 label = FieldAdvisor.text("ftdl_action_irrigate_dry", "Bewässern (trocken)"),
@@ -945,13 +1616,19 @@ function FieldAdvisor.resolveActionCandidates(field, fieldState, pfSample, scsSa
             })
         end
 
-        if scsSample ~= nil and scsSample.stress ~= nil and scsSample.stress >= 0.6 then
+        if SeasonalCropStressReader.isRuntimeReady()
+            and scsSample ~= nil
+            and scsSample.stress ~= nil
+            and scsSample.stress >= 0.6 then
             FieldAdvisor_addAction(actions, {
                 actionType = "scs_stress_high",
                 label = FieldAdvisor.text("ftdl_action_stress_high", "Pflanzenstress hoch"),
                 autoComplete = true,
             })
-        elseif scsSample ~= nil and scsSample.stress ~= nil and scsSample.stress >= 0.35 then
+        elseif SeasonalCropStressReader.isRuntimeReady()
+            and scsSample ~= nil
+            and scsSample.stress ~= nil
+            and scsSample.stress >= 0.35 then
             FieldAdvisor_addAction(actions, {
                 actionType = "scs_stress_watch",
                 label = FieldAdvisor.text("ftdl_action_stress_watch", "Stress beobachten"),
@@ -1284,151 +1961,12 @@ function FieldAdvisor.formatSuggestionColumn(actions, expectedHarvest)
     return primary
 end
 
----@param actions table[]
----@return string
-function FieldAdvisor.formatSuggestionList(actions)
-    return FieldAdvisor.formatSuggestionColumn(actions, nil)
-end
-
 ---@param actionType string
 ---@param context table
 ---@param actionMeta table|nil
 ---@return boolean
 function FieldAdvisor.isActionComplete(actionType, context, actionMeta)
-    if actionType == nil or actionType == "none" or context == nil then
-        return false
-    end
-
-    local field = context.field
-    local fieldState = context.fieldState
-    local rules = context.rules or FieldGameRules.get()
-    local pfSample = context.pfSample
-    local scsSample = context.scsSample
-
-    if actionType == "harvest" then
-        return not FieldAdvisor.isHarvestReady(field, fieldState)
-    end
-
-    if actionType == "plow" then
-        if FieldAdvisor.isWithered(fieldState) then
-            return false
-        end
-
-        if not rules.plowingRequiredEnabled then
-            return true
-        end
-
-        return not context.needsPlowing and context.plowLevel <= 0
-    end
-
-    if actionType == "cultivate" then
-        if FieldAdvisor.isWithered(fieldState) then
-            return false
-        end
-
-        if FieldAdvisor.hasActiveCrop(fieldState) then
-            return false
-        end
-
-        local groundType = string.lower(tostring(fieldState ~= nil and fieldState.groundType or ""))
-        if string.find(groundType, "cultivat", 1, true) ~= nil
-            or string.find(groundType, "seedbed", 1, true) ~= nil
-            or string.find(groundType, "plow", 1, true) ~= nil then
-            return true
-        end
-
-        local isCultivated = FieldAdvisor.getStateBool(fieldState, "isCultivated")
-            or FieldAdvisor.getStateBool(fieldState, "cultivated")
-            or FieldAdvisor.getStateBool(fieldState, "seedbed")
-            or FieldAdvisor.getStateBool(fieldState, "isSeedbed")
-
-        if isCultivated then
-            return true
-        end
-
-        return false
-    end
-
-    if actionType == "lime" then
-        if not rules.limeRequired then
-            return true
-        end
-
-        return not context.needsLime and context.limeLevel <= 0
-    end
-
-    if actionType == "weed_combat" then
-        if not rules.weedsEnabled then
-            return true
-        end
-
-        return context.weedState < 3
-    end
-
-    if actionType == "weed_watch" then
-        if not rules.weedsEnabled then
-            return true
-        end
-
-        return context.weedState <= 0
-    end
-
-    if actionType == "stones" then
-        if not rules.stonesEnabled then
-            return true
-        end
-
-        return context.stoneLevel <= 0
-    end
-
-    if actionType == "roller" then
-        if FieldAdvisor.isWithered(fieldState) then
-            return false
-        end
-
-        return not context.needsRolling and context.rollerLevel <= 0
-    end
-
-    if actionType == "pf_ph" then
-        return pfSample == nil or pfSample.pHValue == nil or pfSample.pHValue >= 6.0
-    end
-
-    if actionType == "pf_n" then
-        if pfSample == nil or pfSample.nitrogenValue == nil then
-            return true
-        end
-
-        local nitrogen = tonumber(pfSample.nitrogenValue) or 0
-        if actionMeta ~= nil and actionMeta.fertPass ~= nil then
-            local passTotal = tonumber(actionMeta.fertPassTotal) or 1
-            local target = FieldAdvisor.getOrganicFertilizerPassTarget(actionMeta.fertPass, passTotal, 80)
-            return nitrogen >= target
-        end
-
-        return nitrogen >= 80
-    end
-
-    if actionType == "scs_moisture" then
-        return scsSample == nil or scsSample.moisture == nil or scsSample.moisture >= 0.25
-    end
-
-    if actionType == "scs_stress_high" then
-        return scsSample == nil or scsSample.stress == nil or scsSample.stress < 0.6
-    end
-
-    if actionType == "scs_stress_watch" then
-        return scsSample == nil or scsSample.stress == nil or scsSample.stress < 0.35
-    end
-
-    if actionType == "withered" then
-        return not FieldAdvisor.isWithered(fieldState)
-    end
-
-    if actionType == "sow" then
-        return FieldAdvisor.hasActiveCrop(fieldState) and not FieldAdvisor.isWithered(fieldState)
-    end
-
-    return false
+    return FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
 end
 
 ---@param field table
@@ -1461,120 +1999,89 @@ function FieldAdvisor.isPositionInsideField(field, x, z)
     return true
 end
 
----@param field table
----@param centerX number
----@param centerZ number
----@return table[]
-function FieldAdvisor.collectFieldSamplePoints(field, centerX, centerZ)
-    local points = {}
-    points[#points + 1] = { x = centerX, z = centerZ }
-
-    local areaHa = tonumber(field ~= nil and field.areaHa) or 0
-    if areaHa <= 0 then
-        return points
-    end
-
-    local areaM2 = areaHa * 10000
-    local halfExtent = math.max(8, math.sqrt(areaM2) * 0.45)
-    local steps = math.max(1, FieldAdvisor.JOB_SAMPLE_GRID_STEPS)
-
-    for ix = -steps, steps do
-        for iz = -steps, steps do
-            if not (ix == 0 and iz == 0) then
-                local sampleX = centerX + (ix / steps) * halfExtent
-                local sampleZ = centerZ + (iz / steps) * halfExtent
-                if FieldAdvisor.isPositionInsideField(field, sampleX, sampleZ) then
-                    points[#points + 1] = { x = sampleX, z = sampleZ }
-                end
-            end
-        end
-    end
-
-    return points
-end
-
----@param field table
----@param task table
----@param centerX number
----@param centerZ number
----@return number|nil
-function FieldAdvisor.getActionCompletionRatio(field, task, centerX, centerZ)
-    if field == nil or task == nil or field.fieldState == nil or field.fieldState.update == nil then
+---@param field table|nil
+---@param fieldId number|nil
+---@param worldX number|nil
+---@param worldZ number|nil
+---@return table|nil
+function FieldAdvisor.captureTaskBaseline(field, fieldId, worldX, worldZ)
+    local fieldState = FieldAdvisor.getEnrichedFieldState(field, fieldId, worldX, worldZ)
+    if fieldState == nil then
         return nil
     end
 
-    local points = FieldAdvisor.collectFieldSamplePoints(field, centerX, centerZ)
-    if points == nil or #points == 0 then
-        return nil
-    end
+    local context = FieldAdvisor.buildFieldContext(field, fieldState, worldX, worldZ)
 
-    local total = 0
-    local completed = 0
-
-    for _, point in ipairs(points) do
-        field.fieldState:update(point.x, point.z)
-        local sampleState = FieldAdvisor.getFieldState(field)
-        local sampleContext = FieldAdvisor.buildFieldContext(field, sampleState, point.x, point.z)
-
-        total = total + 1
-        if FieldAdvisor.isActionComplete(task.actionType, sampleContext, task) then
-            completed = completed + 1
-        end
-    end
-
-    field.fieldState:update(centerX, centerZ)
-
-    if total <= 0 then
-        return nil
-    end
-
-    return completed / total
+    return {
+        growthState = FieldAdvisor.getGrowthState(fieldState),
+        lastGrowthState = FieldAdvisor.getLastGrowthState(fieldState),
+        groundType = FieldAdvisor.getGroundTypeName(fieldState),
+        fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState),
+        weedState = context.weedState,
+        weedFactor = context.weedFactor,
+        needsPlowing = context.needsPlowing,
+        needsLime = context.needsLime,
+        needsRolling = context.needsRolling,
+        plowLevel = context.plowLevel,
+        limeLevel = context.limeLevel,
+        rollerLevel = context.rollerLevel,
+        stoneLevel = context.stoneLevel,
+        stubbleShredLevel = FieldAdvisor.getStateNumber(fieldState, "stubbleShredLevel"),
+        wasGrassCut = FieldAdvisor.isGrassCut(fieldState),
+        wasGrassHarvestable = FieldAdvisor.isGrassHarvestable(fieldState),
+        phValue = context.pfSample ~= nil and context.pfSample.pHValue or nil,
+        nitrogenValue = context.pfSample ~= nil and context.pfSample.nitrogenValue or nil,
+    }
 end
 
 ---@param task table
 ---@param scanner FieldScanner
 ---@return boolean
 function FieldAdvisor.isFieldTaskComplete(task, scanner)
-    if task == nil or task.source ~= "field" or task.completed or task.autoComplete ~= true then
+    if FieldTaskCompletion == nil then
         return false
     end
 
-    if task.actionType == nil
-        or task.actionType == "none"
-        or task.actionType == "harvest_info"
-        or task.actionType == "growing"
-        or task.actionType == "custom" then
-        return false
-    end
-
-    local field = scanner:getEngineFieldById(task.fieldId)
-    if field == nil then
-        return false
-    end
-
-    local posX, posZ = field:getCenterOfFieldWorldPosition()
-    if posX ~= nil and posZ ~= nil and field.fieldState ~= nil and field.fieldState.update ~= nil then
-        field.fieldState:update(posX, posZ)
-    end
-
-    local fieldState = FieldAdvisor.getFieldState(field)
-    local context = FieldAdvisor.buildFieldContext(field, fieldState, posX, posZ)
-    local completionRatio = FieldAdvisor.getActionCompletionRatio(field, task, posX, posZ)
-    if completionRatio ~= nil then
-        return completionRatio >= FieldAdvisor.JOB_COMPLETION_THRESHOLD
-    end
-
-    return FieldAdvisor.isActionComplete(task.actionType, context, task)
+    return FieldTaskCompletion.isTaskComplete(task, scanner)
 end
 
----@param field table
----@param fieldState table|nil
----@param pfSample table|nil
----@param scsSample table|nil
----@param rules table|nil
----@return string suggestion
-function FieldAdvisor.buildSuggestion(field, fieldState, pfSample, scsSample, rules)
-    return FieldAdvisor.resolvePrimaryAction(field, fieldState, pfSample, scsSample, rules).label
+---@param task table
+---@param context table
+---@return boolean
+function FieldAdvisor.hasCompletionProgress(task, context)
+    local baseline = task ~= nil and task.completionBaseline or nil
+    if baseline == nil or context == nil or context.fieldState == nil then
+        return false
+    end
+
+    local fieldState = context.fieldState
+    local actionType = task.actionType
+
+    if FieldTaskCompletion ~= nil and FieldTaskCompletion.requiresCoverageOnly(FieldTaskCompletion.getEntry(actionType)) then
+        return false
+    end
+
+    if actionType == "weed_combat" or actionType == "weed_watch" then
+        if FieldAdvisor.isWeedDeadOrSprayed(fieldState) then
+            return true
+        end
+
+        if FieldAdvisor.hasWeedFactorReading(fieldState) and baseline.weedFactor ~= nil then
+            return FieldAdvisor.getWeedFactor(fieldState) < baseline.weedFactor - 0.01
+        end
+
+        return FieldAdvisor.getWeedStateLevel(fieldState) < (baseline.weedState or 0)
+    end
+
+    if actionType == "pf_ph" and context.pfSample ~= nil and context.pfSample.pHValue ~= nil and baseline.phValue ~= nil then
+        return tonumber(context.pfSample.pHValue) > tonumber(baseline.phValue)
+    end
+
+    if actionType == "pf_n" and context.pfSample ~= nil and context.pfSample.nitrogenValue ~= nil and baseline.nitrogenValue ~= nil then
+        return tonumber(context.pfSample.nitrogenValue) > tonumber(baseline.nitrogenValue)
+    end
+
+    return false
 end
 
 ---@param field table
@@ -1609,10 +2116,12 @@ function FieldAdvisor.buildFieldLabels(field, fieldState, worldX, worldZ)
         context.scsSample,
         context.rules
     )
-    local fruitTypeIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
+    local fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState)
+    local fieldId = field.getId ~= nil and field:getId() or nil
+    local partialSoilWork = FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState, worldX, worldZ)
 
     return {
-        weed = FieldAdvisor.formatWeedLabel(weedState, rules),
+        weed = FieldAdvisor.formatWeedDisplayLabel(fieldState, rules),
         stones = FieldAdvisor.formatStoneLabel(stoneLevel, rules),
         lime = FieldAdvisor.formatLimeLabel(limeLevel, rules),
         roller = FieldAdvisor.formatRollerLabel(rollerLevel, needsRolling),
@@ -1621,15 +2130,15 @@ function FieldAdvisor.buildFieldLabels(field, fieldState, worldX, worldZ)
         nitrogen = context.pfSample ~= nil and context.pfSample.nitrogenLabel or nil,
         moisture = context.scsSample ~= nil and context.scsSample.moistureLabel or nil,
         stress = context.scsSample ~= nil and context.scsSample.stressLabel or nil,
-        fruit = FieldAdvisor.getLocalizedFruitTitle(fruitTypeIndex),
+        fruit = FieldAdvisor.getFieldFruitDisplayLabel(field, fieldId, fieldState, worldX, worldZ),
         cropPhase = FieldAdvisor.getCropPhase(field, fieldState),
         expectedHarvest = FieldAdvisor.getExpectedHarvestLabel(field, fieldState),
         suggestion = FieldAdvisor.formatSuggestionColumn(actions, FieldAdvisor.getExpectedHarvestLabel(field, fieldState)),
         suggestionDetails = actions,
         actionType = action.actionType,
         autoComplete = action.autoComplete,
-        isGrass = FieldAdvisor.isGrassCrop(fruitTypeIndex),
+        isGrass = FieldAdvisor.isGrassCrop(fruitTypeIndex) and not partialSoilWork,
         showPrecisionFarming = PrecisionFarmingReader.isRuntimeReady(),
-        showCropStress = SeasonalCropStressReader.isModLoaded(),
+        showCropStress = SeasonalCropStressReader.isRuntimeReady(),
     }
 end
