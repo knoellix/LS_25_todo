@@ -88,7 +88,7 @@
                         <SmoothList id="fieldList" profile="ftdlSmoothList"
                                     startClipperElementName="fieldListStart"
                                     endClipperElementName="fieldListEnd"
-                                    focusInit="onOpen">
+                                    focusInit="onOpen" onSelectionChanged="onFieldSelectionChanged">
                             <ListItem profile="ftdlListRow" name="fieldRowTemplate" onClick="onClickFieldRow">
                                 <Bitmap profile="ftdlRowBg" name="alternating"/>
                                 <Text profile="ftdlCellSmall" name="fieldName" size="44px 30px" textLayoutMode="scrolling"/>

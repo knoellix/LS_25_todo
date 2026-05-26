@@ -327,7 +327,6 @@ function FieldToDoMenuFrame:refreshLists()
         self.manualTasks = {}
         self.ownedFields = {}
     else
-        manager:updateAutoCompletion()
         self.manualTasks = manager:getManualTasks()
         self.ownedFields = manager:getOwnedFields()
     end
@@ -772,16 +771,11 @@ function FieldToDoMenuFrame:getFieldAtListIndex(listIndex)
     end
 
     local index = math.floor(tonumber(listIndex) or -1)
-    if index < 0 then
+    if index < 1 then
         return nil
     end
 
-    local field = self.ownedFields[index]
-    if field == nil then
-        field = self.ownedFields[index + 1]
-    end
-
-    return field
+    return self.ownedFields[index]
 end
 
 ---@param listIndex number|nil
@@ -791,6 +785,14 @@ function FieldToDoMenuFrame:setSelectedFieldByListIndex(listIndex)
 end
 
 ---@param listItem ListItemElement|nil
+function FieldToDoMenuFrame:onFieldSelectionChanged()
+    if self.fieldList == nil then
+        return
+    end
+
+    self:setSelectedFieldByListIndex(self.fieldList.selectedIndex)
+end
+
 function FieldToDoMenuFrame:onClickFieldRow(listItem)
     if listItem == nil then
         return

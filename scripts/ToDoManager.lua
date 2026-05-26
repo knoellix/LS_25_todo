@@ -469,13 +469,19 @@ function ToDoManager:updateAutoCompletion()
     end
 
     local completedCount = 0
+    local pendingIds = {}
 
-    for _, task in pairs(self.manualTasks) do
+    for taskId, task in pairs(self.manualTasks) do
         if not task.completed and task.source == "field" and task.autoComplete == true then
-            if FieldAdvisor.isFieldTaskComplete(task, self.fieldScanner) then
-                self:onTaskMarkedComplete(task)
-                completedCount = completedCount + 1
-            end
+            pendingIds[#pendingIds + 1] = taskId
+        end
+    end
+
+    for _, taskId in ipairs(pendingIds) do
+        local task = self.manualTasks[taskId]
+        if task ~= nil and not task.completed and FieldAdvisor.isFieldTaskComplete(task, self.fieldScanner) then
+            self:onTaskMarkedComplete(task)
+            completedCount = completedCount + 1
         end
     end
 
@@ -624,12 +630,14 @@ function ToDoManager:loadTaskFromXML(xmlFile, taskKey)
         return nil
     end
 
+    local autoCompleteRaw = xmlFile:getValue(taskKey .. "#autoComplete")
+
     local task = {
         id = taskId,
         text = text,
         completed = xmlFile:getValue(taskKey .. "#completed") == true,
         source = xmlFile:getValue(taskKey .. "#source") or "manual",
-        autoComplete = xmlFile:getValue(taskKey .. "#autoComplete") == true,
+        autoComplete = autoCompleteRaw == true,
     }
 
     local fieldId = xmlFile:getValue(taskKey .. "#fieldId")
@@ -644,7 +652,7 @@ function ToDoManager:loadTaskFromXML(xmlFile, taskKey)
     end
 
     if task.source == "field" and task.actionType ~= nil and task.actionType ~= "" and task.actionType ~= "custom" then
-        if task.autoComplete == nil then
+        if autoCompleteRaw == nil then
             task.autoComplete = true
         end
     end

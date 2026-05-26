@@ -875,7 +875,7 @@ function FieldAdvisor.isFieldSown(fieldState)
         return true
     end
 
-    return FieldAdvisor.hasActiveCrop(fieldState)
+    return false
 end
 
 ---@param fieldState table|nil
