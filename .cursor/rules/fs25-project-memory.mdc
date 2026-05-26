@@ -1,0 +1,46 @@
+---
+description: Core project memory for FS25_FieldToDoList
+alwaysApply: true
+---
+
+# FS25_FieldToDoList - Project Rules
+
+## Release and Build
+
+- Keep `modDesc.xml` version unchanged unless the user explicitly requests a release bump.
+- Preferred local build command: `python3 tools/generate_assets.py && ./build.sh`.
+- After mod updates, do a full FS25 restart.
+
+## Save and Runtime Safety
+
+- Access savegame `fields.xml` only via `FieldSavegameReader` (no ad-hoc direct file reads in other modules).
+- Current project state uses guarded disk reads (`FieldSavegameReader.ENABLE_DISK_READ = true`) with cache and save/load protections.
+- Avoid repeated/looped file reads in menu/update paths; prefer cached values.
+- Avoid SCS field-map loops in menu/update paths (`buildFieldMap`/`enumerateFields`).
+- Keep deferred startup reads (`deferReadsUntilGameplay`) to avoid load deadlocks.
+
+## UI and To-Do Behavior
+
+- To-do ordering is based on `sortIndex` (user order), not work-order presets.
+- Keep moved task selected after Up/Down; clear selection after delete.
+- Guard SmoothList reload selection (`ignoreTaskSelectionChanged`) and sync by task id, not row index.
+- Keep mini button labels `Hoch` / `Runter`; no drag-and-drop.
+
+## HUD and Logging
+
+- HUD shows manual tasks only (`getManualTasksForDisplay()`), max 5 open tasks.
+- Keep HUD simple (plain panel, no settings line in HUD).
+- In `InGameMenuIntegration`, use `Logging.info`/`Logging.warning`; avoid `print()`.
+
+## Task and Advisor Rules
+
+- Open tasks render above completed tasks.
+- Completed tasks capped at 10; newest completed goes to top of completed group.
+- `moveTask` must not cross open/completed boundaries.
+- While `isWithered`, keep plow and roller incomplete in auto-complete checks.
+- For organic mode display, use `getWorkOrderDisplayLabel()` (not preset label).
+
+## Known Open Bug (Next Session)
+
+- Field 14 can still be misclassified as grass after plowing.
+- Priority fix area: `FieldAdvisor.isGrassFieldState` and `getEnrichedFieldState` so live `PLOWED` wins over stale grass metadata.
