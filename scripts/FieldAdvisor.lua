@@ -66,6 +66,10 @@ function FieldAdvisor.isNonGrassSoilState(fieldState)
         return true
     end
 
+    if FieldAdvisor.getStateNumber(fieldState, "plowLevel") > 0 then
+        return true
+    end
+
     if FieldAdvisor.groundTypeIsOneOf(groundTypeName, { "SOWN", "PLANTED", "RIDGE_SOWN", "ROLLER_LINES" }) then
         local fruitTypeIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
         if fruitTypeIndex ~= nil and fruitTypeIndex > 0 then
@@ -98,6 +102,12 @@ function FieldAdvisor.clearStaleGrassMetadata(fieldState)
             and FieldAdvisor.GRASS_FRUIT_NAMES[string.upper(tostring(rawName))] == true then
             fieldState[key] = nil
         end
+    end
+
+    local fruitTypeIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
+    if fruitTypeIndex ~= nil and FieldAdvisor.isGrassCrop(fruitTypeIndex) then
+        fieldState.fruitTypeIndex = FruitType ~= nil and FruitType.UNKNOWN or 0
+        fieldState.currentFruitTypeIndex = nil
     end
 
     if FieldAdvisor.isGrassGroundType(FieldAdvisor.getGroundTypeName(fieldState)) then
@@ -391,28 +401,13 @@ function FieldAdvisor.enrichFieldStateFromField(field, fieldState)
     for _, probe in ipairs(fieldProbes) do
         if field[probe] ~= nil then
             local ok, value = pcall(field[probe], field)
-            if ok then
-                if type(value) == "number" then
-                    assignFruitIndex(value)
-                elseif type(value) == "string" and value ~= "" and value ~= "UNKNOWN" then
-                    if fieldState.fruitType == nil then
-                        fieldState.fruitType = value
-                    end
-                end
+            if ok and type(value) == "number" then
+                assignFruitIndex(value)
             end
         end
     end
 
-    if fieldState.groundType == nil and field.groundType ~= nil then
-        fieldState.groundType = field.groundType
-    end
-
-    if fieldState.groundType == nil and field.getGroundType ~= nil then
-        local ok, groundType = pcall(field.getGroundType, field)
-        if ok and groundType ~= nil then
-            fieldState.groundType = groundType
-        end
-    end
+    -- Do not copy field.groundType here: live FieldState:update() is authoritative.
 end
 
 ---@param fieldState table|nil
@@ -435,26 +430,11 @@ function FieldAdvisor.isGrassFieldState(fieldState, field)
             if FieldAdvisor.isGrassCrop(fruitTypeIndex) then
                 return true
             end
+            return false
         end
     end
 
     if fieldState ~= nil then
-        local fruitNameFields = {
-            "fruitTypeName",
-            "fruitType",
-            "currentFruitType",
-            "fruit",
-        }
-
-        for _, key in ipairs(fruitNameFields) do
-            local rawName = fieldState[key]
-            if rawName ~= nil and rawName ~= "" and rawName ~= "UNKNOWN" then
-                if FieldAdvisor.GRASS_FRUIT_NAMES[string.upper(tostring(rawName))] == true then
-                    return true
-                end
-            end
-        end
-
         if FieldAdvisor.isGrassGroundType(groundTypeName) then
             return true
         end
@@ -482,35 +462,25 @@ end
 ---@param field table|nil
 ---@return number|nil
 function FieldAdvisor.resolveFruitTypeIndex(fieldState, field)
+    if FieldAdvisor.isNonGrassSoilState(fieldState) then
+        return nil
+    end
+
     local fruitTypeIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
     if fruitTypeIndex ~= nil and fruitTypeIndex > 0 then
         if FruitType == nil or fruitTypeIndex ~= FruitType.UNKNOWN then
+            if FieldAdvisor.isGrassCrop(fruitTypeIndex) then
+                if FieldAdvisor.isGrassFieldState(fieldState, field) then
+                    return fruitTypeIndex
+                end
+                return nil
+            end
             return fruitTypeIndex
         end
     end
 
-    if fieldState ~= nil then
-        local fruitNameFields = {
-            "fruitTypeName",
-            "fruitType",
-            "plannedFruit",
-            "currentFruitType",
-            "fruit",
-        }
-
-        for _, key in ipairs(fruitNameFields) do
-            local rawName = fieldState[key]
-            if rawName ~= nil and rawName ~= "" and rawName ~= "UNKNOWN" then
-                fruitTypeIndex = FieldAdvisor.getFruitTypeIndexByName(rawName)
-                if fruitTypeIndex ~= nil then
-                    return fruitTypeIndex
-                end
-            end
-        end
-
-        if FieldAdvisor.isGrassFieldState(fieldState, field) then
-            return FieldAdvisor.getDefaultGrassFruitTypeIndex()
-        end
+    if fieldState ~= nil and FieldAdvisor.isGrassFieldState(fieldState, field) then
+        return FieldAdvisor.getDefaultGrassFruitTypeIndex()
     end
 
     return nil
@@ -522,87 +492,30 @@ end
 ---@param worldZ number|nil
 ---@return table|nil
 function FieldAdvisor.getEnrichedFieldState(field, fieldId, worldX, worldZ)
-    -- Prefer a fresh density-map sample. field:getFieldState() may be stale/cached on some maps.
+    -- Live density-map sample only. No savegame fields.xml overlay.
     local fieldState = FieldAdvisor.getLiveFieldState(worldX, worldZ)
     if fieldState == nil then
         fieldState = FieldAdvisor.getFieldState(field)
         if fieldState ~= nil and fieldState.update ~= nil and worldX ~= nil and worldZ ~= nil then
-            fieldState:update(worldX, worldZ)
+            local ok = pcall(fieldState.update, fieldState, worldX, worldZ)
+            if not ok then
+                fieldState = nil
+            end
         end
     end
 
     if fieldState == nil then
-        fieldState = {}
-    else
-        local cloned = setmetatable({}, getmetatable(fieldState))
-        for key, value in pairs(fieldState) do
-            cloned[key] = value
-        end
-        fieldState = cloned
+        return {
+            fruitTypeIndex = FruitType ~= nil and FruitType.UNKNOWN or 0,
+            growthState = 0,
+            groundType = FieldGroundType ~= nil and FieldGroundType.NONE or 0,
+        }
     end
 
     FieldAdvisor.enrichFieldStateFromField(field, fieldState)
 
-    local saveAttrs = FieldSavegameReader ~= nil and FieldSavegameReader.getFieldAttributes(fieldId) or nil
-    if saveAttrs == nil then
-        return fieldState
-    end
-
-    local engineGroundType = FieldAdvisor.getGroundTypeName(fieldState)
-    local blockGrassOverlay = FieldAdvisor.isNonGrassSoilState(fieldState)
-
-    if saveAttrs.groundType ~= nil
-        and saveAttrs.groundType ~= "NONE"
-        and FieldAdvisor.groundTypeIsOneOf(saveAttrs.groundType, FieldAdvisor.NON_GRASS_GROUND_TYPES)
-        and FieldAdvisor.isGrassGroundType(engineGroundType) then
-        fieldState.groundType = saveAttrs.groundType
-        blockGrassOverlay = true
-    end
-
-    if not blockGrassOverlay then
-        if fieldState.plannedFruit == nil and saveAttrs.plannedFruit ~= nil then
-            fieldState.plannedFruit = saveAttrs.plannedFruit
-        end
-
-        if fieldState.fruitType == nil and saveAttrs.fruitType ~= nil then
-            fieldState.fruitType = saveAttrs.fruitType
-        end
-    end
-
-    local engineFruitIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
-    if (engineFruitIndex == nil or (FruitType ~= nil and engineFruitIndex == FruitType.UNKNOWN))
-        and saveAttrs.fruitType ~= nil
-        and saveAttrs.fruitType ~= "UNKNOWN"
-        and not blockGrassOverlay then
-        fieldState.fruitTypeName = saveAttrs.fruitType
-    end
-
-    local groundTypeName = FieldAdvisor.getGroundTypeName(fieldState)
-    if saveAttrs.groundType ~= nil
-        and saveAttrs.groundType ~= "NONE"
-        and (groundTypeName == "" or groundTypeName == "NONE")
-        and not (FieldAdvisor.isGrassGroundType(saveAttrs.groundType) and blockGrassOverlay) then
-        fieldState.groundType = saveAttrs.groundType
-    end
-
     if FieldAdvisor.isNonGrassSoilState(fieldState) then
         FieldAdvisor.clearStaleGrassMetadata(fieldState)
-    end
-
-    -- Never overlay save weedState: stale values keep "spray weeds" after spraying (dead weeds stay weedState 8–9).
-
-    if FieldAdvisor.getLastGrowthState(fieldState) <= 0 and (saveAttrs.lastGrowthState or 0) > 0 then
-        fieldState.lastGrowthState = saveAttrs.lastGrowthState
-    end
-
-    local saveGrowth = saveAttrs.growthState or 0
-    if saveGrowth > 0 and FieldAdvisor.getGrowthState(fieldState) <= 0
-        and not FieldAdvisor.isNonGrassSoilState(fieldState) then
-        local saveFruit = saveAttrs.fruitType ~= nil and string.upper(tostring(saveAttrs.fruitType)) or ""
-        if FieldAdvisor.isGrassGroundType(saveAttrs.groundType)
-            or FieldAdvisor.GRASS_FRUIT_NAMES[saveFruit] == true then
-            fieldState.growthState = saveGrowth
-        end
     end
 
     return fieldState
@@ -1359,7 +1272,7 @@ function FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState, worldX
     local centerIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState, field)
     local centerGrass = FieldAdvisor.isGrassFieldState(fieldState, field)
 
-    if not centerGrass then
+    if not centerGrass or FieldAdvisor.isNonGrassSoilState(fieldState) then
         return false
     end
 
@@ -1371,10 +1284,12 @@ function FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState, worldX
     end
 
     for _, point in ipairs(points) do
-        local sampleState = FieldAdvisor.getEnrichedFieldState(field, fieldId, point.x, point.z)
-        local groundType = FieldAdvisor.getGroundTypeName(sampleState)
-        if FieldAdvisor.groundTypeIsOneOf(groundType, FieldAdvisor.SOIL_WORK_GROUND_TYPES) then
-            return true
+        if FieldAdvisor.isPositionInsideField(field, point.x, point.z) then
+            local sampleState = FieldAdvisor.getEnrichedFieldState(field, fieldId, point.x, point.z)
+            local groundType = FieldAdvisor.getGroundTypeName(sampleState)
+            if FieldAdvisor.groundTypeIsOneOf(groundType, FieldAdvisor.SOIL_WORK_GROUND_TYPES) then
+                return true
+            end
         end
     end
 
@@ -1388,6 +1303,10 @@ end
 ---@param worldZ number|nil
 ---@return string
 function FieldAdvisor.getFieldFruitDisplayLabel(field, fieldId, fieldState, worldX, worldZ)
+    if FieldAdvisor.isNonGrassSoilState(fieldState) then
+        return FieldAdvisor.getLocalizedFruitTitle(FieldAdvisor.resolveFruitTypeIndex(fieldState, field))
+    end
+
     if FieldAdvisor.isGrassFieldState(fieldState, field) then
         local fruitTypeIndex = FieldAdvisor.resolveFruitTypeIndex(fieldState, field)
         local label = FieldAdvisor.getLocalizedFruitTitle(fruitTypeIndex)
@@ -2446,16 +2365,21 @@ function FieldAdvisor.resolveRepresentativeFieldState(field, fieldId, fieldState
         return fieldState
     end
 
-    -- Fast path: center sample already provides usable crop information.
+    -- Fast path only for unambiguous crop fields (not stale grass residue on plowed soil).
     if fieldState ~= nil then
-        if FieldAdvisor.isGrassFieldState(fieldState, field) then
-            return fieldState
-        end
         if FieldAdvisor.isGrassHarvestable(fieldState, field) then
             return fieldState
         end
-        if FieldAdvisor.resolveFruitTypeIndex(fieldState, field) ~= nil then
+        if FieldAdvisor.isNonGrassSoilState(fieldState) then
             return fieldState
+        end
+        local fruitTypeIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
+        if fruitTypeIndex ~= nil and fruitTypeIndex > 0 then
+            if FruitType == nil or fruitTypeIndex ~= FruitType.UNKNOWN then
+                if not FieldAdvisor.isGrassCrop(fruitTypeIndex) then
+                    return fieldState
+                end
+            end
         end
     end
 
@@ -2481,28 +2405,40 @@ function FieldAdvisor.resolveRepresentativeFieldState(field, fieldId, fieldState
     local grassCandidate = nil
     local grassGrowth = -1
     local cropCandidate = nil
+    local soilWorkCandidate = nil
     for _, point in ipairs(points) do
-        local sampleState = FieldAdvisor.getEnrichedFieldState(field, fieldId, point.x, point.z)
-        if sampleState ~= nil then
-            if FieldAdvisor.isGrassHarvestable(sampleState, field) then
-                return sampleState
-            end
-
-            if FieldAdvisor.isGrassFieldState(sampleState, field) then
-                local growth = FieldAdvisor.getEffectiveGrowthState(sampleState)
-                if grassCandidate == nil or growth > grassGrowth then
-                    grassCandidate = sampleState
-                    grassGrowth = growth
+        if FieldAdvisor.isPositionInsideField(field, point.x, point.z) then
+            local sampleState = FieldAdvisor.getEnrichedFieldState(field, fieldId, point.x, point.z)
+            if sampleState ~= nil then
+                if FieldAdvisor.isGrassHarvestable(sampleState, field) then
+                    return sampleState
                 end
-            end
 
-            local sampleFruit = FieldAdvisor.resolveFruitTypeIndex(sampleState, field)
-            if sampleFruit ~= nil and cropCandidate == nil and FieldAdvisor.hasActiveCrop(sampleState) then
-                cropCandidate = sampleState
+                local sampleGroundType = FieldAdvisor.getGroundTypeName(sampleState)
+                if FieldAdvisor.groundTypeIsOneOf(sampleGroundType, FieldAdvisor.SOIL_WORK_GROUND_TYPES)
+                    or FieldAdvisor.isNonGrassSoilState(sampleState) then
+                    soilWorkCandidate = sampleState
+                end
+
+                if FieldAdvisor.isGrassFieldState(sampleState, field) then
+                    local growth = FieldAdvisor.getEffectiveGrowthState(sampleState)
+                    if grassCandidate == nil or growth > grassGrowth then
+                        grassCandidate = sampleState
+                        grassGrowth = growth
+                    end
+                end
+
+                local sampleFruit = FieldAdvisor.resolveFruitTypeIndex(sampleState, field)
+                if sampleFruit ~= nil and cropCandidate == nil and FieldAdvisor.hasActiveCrop(sampleState) then
+                    cropCandidate = sampleState
+                end
             end
         end
     end
 
+    if soilWorkCandidate ~= nil then
+        return soilWorkCandidate
+    end
     if grassCandidate ~= nil then
         return grassCandidate
     end

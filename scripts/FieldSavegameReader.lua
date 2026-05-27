@@ -5,9 +5,9 @@
 
 FieldSavegameReader = {}
 
---- One-shot cached read after gameplay starts (see deferReadsUntilGameplay / mayReadFieldsFile).
---- Required for grass meadows: engine fieldState often has no fruitType at sample points.
-FieldSavegameReader.ENABLE_DISK_READ = true
+--- Disabled by default: io.open on savegame fields.xml can truncate the file under Proton/Wine
+--- (sharing violation while the game owns the file). Grass/field data must come from live FieldState only.
+FieldSavegameReader.ENABLE_DISK_READ = false
 
 FieldSavegameReader.cache = nil
 FieldSavegameReader.cachePath = nil

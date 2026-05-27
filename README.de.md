@@ -4,7 +4,7 @@
 
 **Autor:** Christian Möllmann ([knoellix](https://github.com/knoellix))  
 **Lizenz:** [GNU GPL v3](LICENSE)  
-**Version:** `0.1.0.1`
+**Version:** `0.1.0.3` (Vorabversion)
 
 ## Funktionen
 
@@ -17,6 +17,8 @@
 - **Auswahl-UX:** nach Verschieben bleibt die Aufgabe ausgewählt; nach Löschen wird die Auswahl entfernt
 - **Erntehinweise:** Vorschlagsspalte zeigt Monatsnamen statt missverständlicher Monatsanzahl
 - **Speicherstand-Daten:** `fieldToDoList.xml` im Savegame-Ordner (Tasks mit ~2 s Debounce; Einstellungen sofort)
+- **Feldstatus:** Live-Boden-/Fruchtdaten aus dem Spiel (kein Laufzeit-Lesen von `fields.xml` — sicherer unter Proton/Linux)
+- **Graswiesen:** Mähen bei Reife; Hinweise zu Schwaden/Sammeln/Ballen; kein falsches Säen auf Wiesen
 
 ## Optionale Mods
 
@@ -29,7 +31,7 @@ Funktioniert vollständig auch ohne Zusatzmods nur mit Basegame-Felddaten.
 
 ## Installation
 
-1. `FS25_FieldToDoList.zip` aus dem [latest release](https://github.com/knoellix/LS_25_todo/releases/latest) laden.
+1. `FS25_FieldToDoList.zip` aus dem [latest release](https://github.com/knoellix/FS25_FieldToDoList/releases/latest) laden.
 2. ZIP (**nicht entpacken**) in den Mods-Ordner kopieren:
 
 | Plattform              | Pfad                                                                                                                            |
@@ -65,18 +67,22 @@ FS25_MODS_DIR=/pfad/zu/mods ./build.sh
 Beiträge sind willkommen (Bugfixes, Features, Übersetzungen).
 
 - Einstieg: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- Übersetzungs-Workflow: [Übersetzungs-Issue öffnen](https://github.com/knoellix/LS_25_todo/issues/new?template=translation.yml)
-- Allgemeine Bugs/Features: [GitHub Issues](https://github.com/knoellix/LS_25_todo/issues)
+- Übersetzungs-Workflow: [Übersetzungs-Issue öffnen](https://github.com/knoellix/FS25_FieldToDoList/issues/new?template=translation.yml)
+- Allgemeine Bugs/Features: [GitHub Issues](https://github.com/knoellix/FS25_FieldToDoList/issues)
+
+## Changelog
+
+Siehe [CHANGELOG.md](CHANGELOG.md). **0.1.0.3:** Live-Feldstatus, verbesserte Gras-/Wiesen-Vorschläge, Proton-sicheres Speichern (kein `fields.xml` zur Laufzeit), Stabilitätsfix für die Feldübersicht.
 
 ## Bekannte Punkte / WIP
 
-- Der Grass-Workflow wird aktuell weiter verbessert (Erkennung und Vorschlagsqualität für verschiedene Grass-/Wiesen-Zustände).
+- Grass-Workflow: Randfälle (z. B. Klassifikation direkt nach dem Pflügen) werden noch nachgeschärft.
 - Auto-Completion ist insgesamt noch in Arbeit und braucht breitere Tests auf realen Spielständen.
 
 ## Issues
 
 Bitte die Issue-Templates für Bugs, Features und Übersetzungen nutzen:
-[GitHub Issues](https://github.com/knoellix/LS_25_todo/issues)
+[GitHub Issues](https://github.com/knoellix/FS25_FieldToDoList/issues)
 
 ## Lizenz
 

@@ -50,7 +50,7 @@ body:
     attributes:
       label: Based on mod version
       description: Version from `modDesc.xml` or release tag you translated against
-      placeholder: e.g. 0.1.0.1
+      placeholder: e.g. 0.1.0.3
     validations:
       required: true
 

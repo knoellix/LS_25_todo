@@ -4,7 +4,7 @@
 
 **Author:** Christian Möllmann ([knoellix](https://github.com/knoellix))  
 **License:** [GNU GPL v3](LICENSE)  
-**Version:** `0.1.0.1`
+**Version:** `0.1.0.3` (pre-release)
 
 ## Features
 
@@ -17,6 +17,8 @@
 - **Selection UX:** after move, the moved task stays selected; after delete, selection is cleared
 - **Harvest hints:** field suggestion column shows month labels instead of ambiguous month counts
 - **Save data:** `fieldToDoList.xml` in the savegame folder (tasks debounced ~2 s after edits; settings saved immediately)
+- **Field status:** live ground/crop readout from the game (the mod does not read `fields.xml` at runtime — safer on Proton/Linux)
+- **Grass meadows:** mow when ready; post-mow hints for swath/collect/bale; avoids suggesting sow on grass
 
 ## Optional mods
 
@@ -31,7 +33,7 @@ Works fully without add-ons using base game field data.
 
 ## Installation
 
-1. Download `FS25_FieldToDoList.zip` from the [latest release](https://github.com/knoellix/LS_25_todo/releases/latest).
+1. Download `FS25_FieldToDoList.zip` from the [latest release](https://github.com/knoellix/FS25_FieldToDoList/releases/latest).
 2. Copy the ZIP (**do not extract**) to your mods folder:
 
 
@@ -41,9 +43,9 @@ Works fully without add-ons using base game field data.
 | macOS                  | `~/Library/Application Support/FarmingSimulator2025/mods/`                                                                    |
 | Linux (Steam / Proton) | `~/.local/share/Steam/steamapps/compatdata/2300320/pfx/drive_c/users/steamuser/Documents/My Games/FarmingSimulator2025/mods/` |
 
-1. Enable **Field To-Do List** in the in-game mod manager.
-2. Load any career save — the mod activates automatically on load.
-3. **Restart the game completely** after installing or updating the mod.
+3. Enable **Field To-Do List** in the in-game mod manager.
+4. Load any career save — the mod activates automatically on load.
+5. **Restart the game completely** after installing or updating the mod.
 
 ## Development
 
@@ -68,17 +70,21 @@ FS25_MODS_DIR=/path/to/mods ./build.sh
 Contributions are welcome (bugfixes, features, translations).
 
 - Start here: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- Translation workflow: [Open translation issue](https://github.com/knoellix/LS_25_todo/issues/new?template=translation.yml)
-- General bugs/features: [GitHub Issues](https://github.com/knoellix/LS_25_todo/issues)
+- Translation workflow: [Open translation issue](https://github.com/knoellix/FS25_FieldToDoList/issues/new?template=translation.yml)
+- General bugs/features: [GitHub Issues](https://github.com/knoellix/FS25_FieldToDoList/issues)
 
 ## Issues
 
 Use issue templates for bug reports, feature requests, and translations:
-[GitHub Issues](https://github.com/knoellix/LS_25_todo/issues)
+[GitHub Issues](https://github.com/knoellix/FS25_FieldToDoList/issues)
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes. Highlights in **0.1.0.3**: live field-state detection, grass/meadow suggestion improvements, Proton-safe save handling (no runtime `fields.xml` reads), field-overview stability fix.
 
 ## Current Work In Progress
 
-- Grass workflow is currently being refined (detection and suggestion quality across different grass/meadow states).
+- Grass workflow edge cases (e.g. classification right after plowing) are still being tuned.
 - Auto-completion is still work in progress and needs broader real-save testing.
 
 ## License

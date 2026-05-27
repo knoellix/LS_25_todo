@@ -11,11 +11,16 @@ alwaysApply: true
 - Preferred local build command: `python3 tools/generate_assets.py && ./build.sh`.
 - After mod updates, do a full FS25 restart.
 
+## Lua / Scripting (FS25)
+
+- **Do not use `goto` / labels** (`::label::`) in mod Lua — the Giants runtime is Lua 5.1-style and does not support them; the script file may fail to load and break entire features (e.g. empty field list).
+- Use normal control flow instead: `if`/`else`, nested loops, helper functions, or `continue`-style `if` blocks inside loops.
+
 ## Save and Runtime Safety
 
-- Access savegame `fields.xml` only via `FieldSavegameReader` (no ad-hoc direct file reads in other modules).
-- Current project state uses guarded disk reads (`FieldSavegameReader.ENABLE_DISK_READ = true`) with cache and save/load protections.
-- Avoid repeated/looped file reads in menu/update paths; prefer cached values.
+- Do not read `savegame*/fields.xml` at runtime (`FieldSavegameReader.ENABLE_DISK_READ = false` — Proton can truncate the file on io.open).
+- If save overlay is ever re-enabled, only via `FieldSavegameReader` with strict one-shot cache and save/load guards.
+- Avoid repeated/looped file reads in menu/update paths; prefer live `FieldState` / engine data.
 - Avoid SCS field-map loops in menu/update paths (`buildFieldMap`/`enumerateFields`).
 - Keep deferred startup reads (`deferReadsUntilGameplay`) to avoid load deadlocks.
 

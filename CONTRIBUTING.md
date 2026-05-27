@@ -45,7 +45,7 @@ python3 tools/generate_assets.py
 Translations are very welcome.
 
 - Open a translation issue using the template:
-  - [New translation issue](https://github.com/knoellix/LS_25_todo/issues/new?template=translation.yml)
+  - [New translation issue](https://github.com/knoellix/FS25_FieldToDoList/issues/new?template=translation.yml)
 - Copy `translations/translation_en.xml` to `translations/translation_<locale>.xml`.
 - Keep all `text name="..."` keys present (no missing keys).
 - Keep short UI labels compact (buttons, columns, HUD).
