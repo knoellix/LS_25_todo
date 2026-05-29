@@ -171,6 +171,21 @@ function FieldToDoMenuFrame:applyMiniButtonIcons()
             end
         end
     end
+
+    self:applyMoveButtonTooltips()
+end
+
+function FieldToDoMenuFrame:applyMoveButtonTooltips()
+    local moveBindings = {
+        { button = self.btnMoveUp, key = "ftdl_btn_up", fallback = "Hoch" },
+        { button = self.btnMoveDown, key = "ftdl_btn_down", fallback = "Runter" },
+    }
+
+    for _, binding in ipairs(moveBindings) do
+        if binding.button ~= nil and binding.button.setToolTipText ~= nil then
+            binding.button:setToolTipText(FieldToDoL10n.getText(binding.key, binding.fallback))
+        end
+    end
 end
 
 function FieldToDoMenuFrame:onGuiSetupFinished()
@@ -293,13 +308,13 @@ function FieldToDoMenuFrame:onFrameUpdate(dt)
     local completedCount = manager:updateAutoCompletion()
 
     self.fieldRescanTimer = (self.fieldRescanTimer or 0) + 1000
-    local shouldRescanFields = self.fieldRescanTimer >= 2500
+    local shouldRescanFields = self.fieldRescanTimer >= 5000
     if shouldRescanFields then
         self.fieldRescanTimer = 0
     end
 
     if completedCount > 0 or shouldRescanFields then
-        self:refreshLists()
+        self:refreshLists(shouldRescanFields)
     end
 end
 
@@ -321,9 +336,11 @@ function FieldToDoMenuFrame:getManager()
     return g_currentMission.fieldToDoList
 end
 
-function FieldToDoMenuFrame:refreshLists()
+function FieldToDoMenuFrame:refreshLists(invalidateFieldsCache)
     local manager = self:getManager()
-    if manager ~= nil and manager.invalidateOwnedFieldsCache ~= nil then
+    if invalidateFieldsCache ~= false
+        and manager ~= nil
+        and manager.invalidateOwnedFieldsCache ~= nil then
         manager:invalidateOwnedFieldsCache()
     end
 

@@ -4,7 +4,7 @@
 
 **Author:** Christian Möllmann ([knoellix](https://github.com/knoellix))  
 **License:** [GNU GPL v3](LICENSE)  
-**Version:** `0.1.0.3` (pre-release)
+**Version:** `0.1.0.4` (pre-release)
 
 ## Features
 
@@ -65,6 +65,36 @@ Custom target:
 FS25_MODS_DIR=/path/to/mods ./build.sh
 ```
 
+## Debug (field advisor)
+
+Works on **Windows, macOS, and Linux** (including Steam/Proton). Use when a field shows wrong crop, harvest month, or grass logistics in the overview.
+
+| Input | Action |
+| ----- | ------ |
+| **F9** or **Left Ctrl + F9** | Open Giants dev console, or mod fallback dialog if console is unavailable |
+| `ftdlHelp` | List mod debug commands |
+| `ftdlDump 63` | Dump one field (replace `63` with field ID) to `log.txt` |
+| `ftdlFruits` | Dump fruit types and harvest growth states |
+| `ftdlAll` | Dump all owned fields |
+
+**Log file** (`log.txt` in your FS25 user folder):
+
+| Platform | Path |
+| -------- | ---- |
+| Windows | `%USERPROFILE%\Documents\My Games\FarmingSimulator2025\log.txt` |
+| macOS | `~/Library/Application Support/FarmingSimulator2025/log.txt` |
+| Linux (Steam / Proton) | `~/.local/share/Steam/steamapps/compatdata/2300320/pfx/drive_c/users/steamuser/Documents/My Games/FarmingSimulator2025/log.txt` |
+
+Search for `[FS25_FieldToDoList] DUMP`. Useful lines: `meadowPhase`, `grassResidue`, `grassCrossScan`, `heightReader`, `harvestState`.
+
+Example:
+
+```text
+ftdlDump 63
+```
+
+No auto-dump on menu open — commands are manual only.
+
 ## Contributing
 
 Contributions are welcome (bugfixes, features, translations).
@@ -80,11 +110,11 @@ Use issue templates for bug reports, feature requests, and translations:
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes. Highlights in **0.1.0.3**: live field-state detection, grass/meadow suggestion improvements, Proton-safe save handling (no runtime `fields.xml` reads), field-overview stability fix.
+See [CHANGELOG.md](CHANGELOG.md) for release notes. Highlights in **0.1.0.4**: debug commands (`ftdlDump`), grass cross-scan for swaths, harvest/regrowth labels, weed coverage rule, advisor stability fixes.
 
 ## Current Work In Progress
 
-- Grass workflow edge cases (e.g. classification right after plowing) are still being tuned.
+- Grass swath → collect/bale suggestions still being tuned on some maps (especially Proton without `DensityMapHeightUtil`).
 - Auto-completion is still work in progress and needs broader real-save testing.
 
 ## License

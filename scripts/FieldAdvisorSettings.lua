@@ -14,6 +14,7 @@ FieldAdvisorSettings.PRESETS = {
         order = {
             "harvest", "stones", "cultivate", "plow", "roller", "lime", "pf_ph", "sow", "pf_n",
             "weed_combat", "weed_watch", "scs_moisture", "scs_stress_high", "scs_stress_watch",
+            "grass_swath", "grass_collect", "grass_bale", "grass_silage_bale", "grass_bale_collect", "grass_mow",
             "harvest_info", "growing", "none",
         },
     },
@@ -23,6 +24,7 @@ FieldAdvisorSettings.PRESETS = {
         order = {
             "harvest", "stones", "cultivate", "lime", "plow", "roller", "pf_ph", "sow", "pf_n",
             "weed_combat", "weed_watch", "scs_moisture", "scs_stress_high", "scs_stress_watch",
+            "grass_swath", "grass_collect", "grass_bale", "grass_silage_bale", "grass_bale_collect", "grass_mow",
             "harvest_info", "growing", "none",
         },
     },
@@ -32,6 +34,7 @@ FieldAdvisorSettings.PRESETS = {
         order = {
             "harvest", "stones", "cultivate", "plow", "roller", "pf_ph", "pf_n", "lime", "sow",
             "weed_combat", "weed_watch", "scs_moisture", "scs_stress_high", "scs_stress_watch",
+            "grass_swath", "grass_collect", "grass_bale", "grass_silage_bale", "grass_bale_collect", "grass_mow",
             "harvest_info", "growing", "none",
         },
     },
@@ -41,6 +44,7 @@ FieldAdvisorSettings.PRESETS = {
         order = {
             "harvest", "stones", "cultivate", "plow", "roller", "lime", "sow", "pf_ph", "pf_n",
             "weed_combat", "weed_watch", "scs_moisture", "scs_stress_high", "scs_stress_watch",
+            "grass_swath", "grass_collect", "grass_bale", "grass_silage_bale", "grass_bale_collect", "grass_mow",
             "harvest_info", "growing", "none",
         },
     },
@@ -50,6 +54,7 @@ FieldAdvisorSettings.PRESETS = {
         order = {
             "harvest", "stones", "cultivate", "lime", "plow", "roller", "pf_ph", "sow", "pf_n",
             "weed_combat", "weed_watch", "scs_moisture", "scs_stress_high", "scs_stress_watch",
+            "grass_swath", "grass_collect", "grass_bale", "grass_silage_bale", "grass_bale_collect", "grass_mow",
             "harvest_info", "growing", "none",
         },
     },

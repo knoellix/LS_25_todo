@@ -17,7 +17,7 @@ local ToDoManager_mt = Class(ToDoManager)
 ToDoManager.XML_KEY = "fieldToDoList"
 ToDoManager.XML_FILENAME = "fieldToDoList.xml"
 ToDoManager.AUTO_CHECK_INTERVAL_MS = 1000
-ToDoManager.OWNED_FIELDS_CACHE_MS = 900
+ToDoManager.OWNED_FIELDS_CACHE_MS = 4000
 ToDoManager.SAVE_DEBOUNCE_MS = 2000
 --- Keep at most this many completed rows; oldest completed (lowest sortIndex) is removed.
 ToDoManager.MAX_COMPLETED_TASKS = 10
@@ -532,7 +532,9 @@ function ToDoManager:update(dt)
         return
     end
 
-    if FieldSavegameReader ~= nil and FieldSavegameReader.deferDiskReads then
+    if FieldSavegameReader ~= nil
+        and FieldSavegameReader.ENABLE_DISK_READ == true
+        and FieldSavegameReader.deferDiskReads then
         FieldSavegameReader.deferDiskReads = false
     end
 

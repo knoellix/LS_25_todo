@@ -102,6 +102,7 @@
         <text name="ftdl_action_scs_stress_watch" text="Stress"/>
         <text name="ftdl_action_harvest_info" text="Ernte"/>
         <text name="ftdl_action_growing" text="Wächst"/>
+        <text name="ftdl_action_regrowth" text="Nachwuchs"/>
         <text name="ftdl_action_none" text="Ok"/>
         <text name="ftdl_action_organic_pass" text="Mist/Gülle %d/%d"/>
         <text name="ftdl_action_mist_pass" text="Mist %d/%d"/>

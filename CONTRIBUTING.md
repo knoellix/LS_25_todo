@@ -15,6 +15,18 @@ python3 tools/generate_assets.py
 
 - Restart FS25 completely after updating the mod ZIP.
 
+## Shell and copy-paste commands
+
+Examples in this repo (README, release notes, agent hints) often use **bash** syntax. Adapt them to your shell.
+
+| Shell | Note |
+| ----- | ---- |
+| **fish** (maintainer) | No bash heredocs — `git commit -m "$(cat <<'EOF' …)"` fails. Use `git commit -m "one line"` or a multi-line fish string instead. |
+| bash / zsh | Heredocs and `$(cat <<'EOF' …)` work as written in many guides. |
+| PowerShell | Use your own quoting; heredocs differ. |
+
+Build/install paths and `git` workflows are the same; only quoting and redirection differ.
+
 ## Preferred Workflow
 
 - Use GitHub Issues to discuss bugs or features first when scope is unclear.

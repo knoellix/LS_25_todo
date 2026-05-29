@@ -114,20 +114,6 @@ function FieldToDoHudOverlay:rebuildDisplayRows()
             }
         end
     end
-
-    if #self.displayRows == 0 then
-        for _, task in ipairs(tasks) do
-            if task.completed and #self.displayRows < FieldToDoHudOverlay.MAX_ENTRIES then
-                self.displayRows[#self.displayRows + 1] = {
-                    text = FieldToDoHudOverlay.truncateText(
-                        FieldToDoHudOverlay.cleanTaskText(task.text),
-                        FieldToDoHudOverlay.MAX_TEXT_CHARS
-                    ),
-                    completed = true,
-                }
-            end
-        end
-    end
 end
 
 ---@param rowCount number

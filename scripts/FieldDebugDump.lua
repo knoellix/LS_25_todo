@@ -98,7 +98,7 @@ function FieldDebugDump.dumpField(fieldId)
 
     local fieldState = FieldAdvisor.getEnrichedFieldState(field, fieldId, worldX, worldZ)
     out(string.format(
-        "FieldState: fruitTypeIndex=%s currentFruitTypeIndex=%s fruitTypeName=%s ground=%s growth=%s lastGrowth=%s weedState=%s sprayLevel=%s",
+        "FieldState: fruitTypeIndex=%s currentFruitTypeIndex=%s fruitTypeName=%s ground=%s growth=%s lastGrowth=%s weedState=%s sprayLevel=%s stubbleShred=%s",
         fruitLabel(fieldState ~= nil and fieldState.fruitTypeIndex or nil),
         fruitLabel(fieldState ~= nil and fieldState.currentFruitTypeIndex or nil),
         s(fieldState ~= nil and fieldState.fruitTypeName or nil),
@@ -106,7 +106,17 @@ function FieldDebugDump.dumpField(fieldId)
         s(FieldAdvisor.getGrowthState(fieldState)),
         s(FieldAdvisor.getLastGrowthState(fieldState)),
         s(FieldAdvisor.getStateNumber(fieldState, "weedState")),
-        s(FieldAdvisor.getStateNumber(fieldState, "sprayLevel"))
+        s(FieldAdvisor.getStateNumber(fieldState, "sprayLevel")),
+        s(FieldAdvisor.getStateNumber(fieldState, "stubbleShredLevel"))
+    ))
+
+    local heightUtil = FieldAdvisor.resolveDensityMapHeightUtil ~= nil and FieldAdvisor.resolveDensityMapHeightUtil() or nil
+    out(string.format(
+        "heightReader: util=%s engineHeight=%s planeId=%s centerMaterial=%.4f",
+        s(heightUtil ~= nil),
+        s(getDensityHeightAtWorldPos ~= nil),
+        s(FieldAdvisor.getHeightDetailPlaneId ~= nil and FieldAdvisor.getHeightDetailPlaneId() or nil),
+        FieldAdvisor.measureHeightMaterialAtPoint ~= nil and FieldAdvisor.measureHeightMaterialAtPoint(worldX, worldZ) or 0
     ))
 
     out(string.format(
@@ -140,6 +150,54 @@ function FieldDebugDump.dumpField(fieldId)
 
     local context = FieldAdvisor.buildFieldContext(field, fieldState, worldX, worldZ)
     local weedSummary = context ~= nil and context.weedSummary or nil
+    local probeState = aggregation.centerState or fieldState
+    out(string.format(
+        "meadowPhase: center=%s representative=%s ground=%s growthFlags(cut=%s harvestable=%s harvestReady=%s)",
+        s(FieldAdvisor.getGrassMeadowPhase(probeState, field, aggregation)),
+        s(FieldAdvisor.getGrassMeadowPhase(aggregation.representativeState, field, aggregation)),
+        s(FieldAdvisor.getGroundTypeName(fieldState)),
+        s((function()
+            local grassFruit = FieldAdvisor.resolveGrassFruitTypeIndex(fieldState, field, aggregation, worldX, worldZ)
+            local growth = FieldAdvisor.evaluateFruitGrowth(grassFruit, FieldAdvisor.getEffectiveGrowthState(fieldState))
+            return growth.isCut
+        end)()),
+        s((function()
+            local grassFruit = FieldAdvisor.resolveGrassFruitTypeIndex(fieldState, field, aggregation, worldX, worldZ)
+            local growth = FieldAdvisor.evaluateFruitGrowth(grassFruit, FieldAdvisor.getEffectiveGrowthState(fieldState))
+            return growth.isHarvestable
+        end)()),
+        s((function()
+            local grassFruit = FieldAdvisor.resolveGrassFruitTypeIndex(fieldState, field, aggregation, worldX, worldZ)
+            local growth = FieldAdvisor.evaluateFruitGrowth(grassFruit, FieldAdvisor.getEffectiveGrowthState(fieldState))
+            return growth.isHarvestReady
+        end)())
+    ))
+    local grassResidue = context ~= nil and context.grassResidueSummary or nil
+    if grassResidue ~= nil then
+        out(string.format(
+            "grassResidue: available=%s source=%s state=%s total=%s occupied=%s ratio=%.3f liters=%.3f maxSample=%.3f swathHits=%s crossPts=%s fillTypes=%d",
+            s(grassResidue.residueAvailable),
+            s(grassResidue.residueSource),
+            s(grassResidue.residueState),
+            s(grassResidue.total),
+            s(grassResidue.occupied),
+            grassResidue.occupiedRatio or 0,
+            grassResidue.totalLiters or 0,
+            grassResidue.maxSampleLiters or 0,
+            s(grassResidue.swathHits),
+            s(grassResidue.crossScanPoints),
+            #(FieldAdvisor.collectWindrowFillTypeIndices(
+                FieldAdvisor.resolveGrassFruitTypeIndex(fieldState, field, aggregation, worldX, worldZ)
+            ))
+        ))
+        local crossMaterial, crossLiters, crossPoints = FieldAdvisor.scanCrossForMaxGrassMaterial(
+            field, worldX, worldZ, FieldAdvisor.GRASS_RESIDUE_CROSS_STEPS
+        )
+        out(string.format(
+            "grassCrossScan: points=%d maxMaterial=%.4f maxLiters=%.3f",
+            crossPoints, crossMaterial, crossLiters
+        ))
+    end
     if weedSummary ~= nil then
         out(string.format(
             "weedCoverage: total=%s live=%s dead=%s liveRatio=%.3f deadRatio=%.3f doneByCoverage=%s",

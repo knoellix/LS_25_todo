@@ -29,42 +29,16 @@ end
 ---@return string
 function FieldScanner:getFruitName(field)
     local fieldState = FieldAdvisor.getFieldState(field)
-
-    if fieldState ~= nil and fieldState.fruitTypeIndex ~= nil then
-        if fieldState.fruitTypeIndex == FruitType.UNKNOWN then
-            return "-"
-        end
-
-        local fruitDesc = g_fruitTypeManager:getFruitTypeByIndex(fieldState.fruitTypeIndex)
-        if fruitDesc ~= nil then
-            local fillType = g_fillTypeManager:getFillTypeByIndex(fruitDesc.fillType)
-            if fillType ~= nil then
-                return fillType.title or fillType.name or "-"
-            end
-
-            return fruitDesc.name or "-"
-        end
+    if fieldState == nil and field ~= nil then
+        fieldState = field.fieldState
     end
 
-    if field.fieldState == nil or field.fieldState.fruitTypeIndex == nil then
+    local fruitTypeIndex = FieldAdvisor.getFruitTypeIndex(fieldState)
+    if fruitTypeIndex == nil or fruitTypeIndex <= 0 then
         return "-"
     end
 
-    if field.fieldState.fruitTypeIndex == FruitType.UNKNOWN then
-        return "-"
-    end
-
-    local fruitDesc = g_fruitTypeManager:getFruitTypeByIndex(field.fieldState.fruitTypeIndex)
-    if fruitDesc == nil then
-        return "-"
-    end
-
-    local fillType = g_fillTypeManager:getFillTypeByIndex(fruitDesc.fillType)
-    if fillType ~= nil then
-        return fillType.title or fillType.name or "-"
-    end
-
-    return fruitDesc.name or "-"
+    return FieldAdvisor.getLocalizedFruitTitle(fruitTypeIndex)
 end
 
 ---@param field table
@@ -327,10 +301,20 @@ end
 ---@param fieldId number
 ---@return table|nil field
 function FieldScanner:getFieldById(fieldId)
-    for _, field in ipairs(self:scanOwnedFields()) do
-        if field.id == fieldId then
-            return field
-        end
+    if fieldId == nil then
+        return nil
+    end
+
+    local engineField = self:getEngineFieldById(fieldId)
+    if engineField == nil then
+        return nil
+    end
+
+    local ok, record = pcall(function()
+        return self:normalizeField(engineField)
+    end)
+    if ok then
+        return record
     end
 
     return nil

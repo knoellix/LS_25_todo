@@ -11,6 +11,19 @@ alwaysApply: true
 - Preferred local build command: `python3 tools/generate_assets.py && ./build.sh`.
 - After mod updates, do a full FS25 restart.
 
+## Maintainer shell (fish)
+
+- **Maintainer uses fish**, not bash — do **not** suggest bash-only syntax (`$(cat <<'EOF' … EOF)`, `source <(…)`).
+- For git commits, prefer a **single `-m "…"`** line or fish-safe multi-line strings; example:
+
+```fish
+git commit -m "Release 0.1.0.4: short summary.
+
+Optional second paragraph in the same string."
+```
+
+- Copy-paste blocks in docs/PR instructions may show bash; note that fish users must adapt redirection/heredocs themselves (see `CONTRIBUTING.md`).
+
 ## Lua / Scripting (FS25)
 
 - **Do not use `goto` / labels** (`::label::`) in mod Lua — the Giants runtime is Lua 5.1-style and does not support them; the script file may fail to load and break entire features (e.g. empty field list).
@@ -29,7 +42,7 @@ alwaysApply: true
 - To-do ordering is based on `sortIndex` (user order), not work-order presets.
 - Keep moved task selected after Up/Down; clear selection after delete.
 - Guard SmoothList reload selection (`ignoreTaskSelectionChanged`) and sync by task id, not row index.
-- Keep mini button labels `Hoch` / `Runter`; no drag-and-drop.
+- Keep mini up/down buttons as arrow icons (↑/↓) with localized tooltips (`Hoch` / `Runter`); no drag-and-drop.
 
 ## HUD and Logging
 

@@ -218,6 +218,29 @@ function FieldTaskCompletion.collectSamplePoints(field, centerX, centerZ)
 end
 
 ---@param field table
+---@param sampleState table|nil
+---@return table
+function FieldTaskCompletion.buildLightSampleContext(field, sampleState)
+    return {
+        field = field,
+        fieldState = sampleState,
+        rules = FieldGameRules.get(),
+        needsPlowing = FieldAdvisor.getStateBool(sampleState, "needsPlowing"),
+        needsLime = FieldAdvisor.getStateBool(sampleState, "needsLime"),
+        needsRolling = FieldAdvisor.getStateBool(sampleState, "needsRolling"),
+        plowLevel = FieldAdvisor.getStateNumber(sampleState, "plowLevel"),
+        limeLevel = FieldAdvisor.getStateNumber(sampleState, "limeLevel"),
+        rollerLevel = FieldAdvisor.getStateNumber(sampleState, "rollerLevel"),
+        stoneLevel = FieldAdvisor.getStateNumber(sampleState, "stoneLevel"),
+        pfSample = nil,
+        scsSample = nil,
+        weedSummary = nil,
+        grassResidueSummary = nil,
+        baleSummary = nil,
+    }
+end
+
+---@param field table
 ---@param task table
 ---@param centerX number
 ---@param centerZ number
@@ -237,7 +260,7 @@ function FieldTaskCompletion.getSampleGridRatio(field, task, centerX, centerZ)
 
     for _, point in ipairs(points) do
         local sampleState = FieldAdvisor.getEnrichedFieldState(field, task.fieldId, point.x, point.z)
-        local sampleContext = FieldAdvisor.buildFieldContext(field, sampleState, point.x, point.z)
+        local sampleContext = FieldTaskCompletion.buildLightSampleContext(field, sampleState)
 
         total = total + 1
         if FieldTaskCompletion.isActionComplete(task.actionType, sampleContext, task) then
@@ -391,7 +414,7 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
             return true
         end
 
-        if context.weedSummary ~= nil and context.weedSummary.total > 0 then
+        if context.weedSummary ~= nil and (context.weedSummary.classified or 0) > 0 then
             return FieldAdvisor.isWeedTaskDoneByCoverage(context.weedSummary)
         end
 
@@ -491,14 +514,15 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
     end
 
     if actionType == "grass_mow" then
-        return FieldAdvisor.isGrassCut(fieldState, field)
+        return FieldAdvisor.isGrassPostMowState(fieldState, field, nil)
+            or FieldAdvisor.isGrassCut(fieldState, field)
     end
 
     if actionType == "grass_swath" then
         local residueSummary = context.grassResidueSummary
-        if residueSummary ~= nil then
+        if residueSummary ~= nil and residueSummary.residueAvailable == true then
             return residueSummary.residueState == FieldAdvisor.GRASS_RESIDUE_SWATH
-                or residueSummary.residueState == FieldAdvisor.GRASS_RESIDUE_NONE
+                or residueSummary.residueState == FieldAdvisor.GRASS_RESIDUE_BALED
         end
 
         if not FieldAdvisor.isGrassCut(fieldState, field) then
@@ -526,7 +550,7 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
 
     if actionType == "grass_collect" then
         local residueSummary = context.grassResidueSummary
-        if residueSummary ~= nil then
+        if residueSummary ~= nil and residueSummary.residueAvailable == true then
             return residueSummary.residueState == FieldAdvisor.GRASS_RESIDUE_NONE
         end
 
@@ -540,7 +564,9 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
         local baseline = actionMeta ~= nil and actionMeta.completionBaseline or nil
         local baselineBales = baseline ~= nil and tonumber(baseline.baleCount) or 0
 
-        if residueSummary ~= nil and baleSummary ~= nil then
+        if residueSummary ~= nil
+            and residueSummary.residueAvailable == true
+            and baleSummary ~= nil then
             return residueSummary.residueState ~= FieldAdvisor.GRASS_RESIDUE_SWATH
                 and tonumber(baleSummary.total or 0) > baselineBales
         end

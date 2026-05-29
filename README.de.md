@@ -4,7 +4,7 @@
 
 **Autor:** Christian Möllmann ([knoellix](https://github.com/knoellix))  
 **Lizenz:** [GNU GPL v3](LICENSE)  
-**Version:** `0.1.0.3` (Vorabversion)
+**Version:** `0.1.0.4` (Vorabversion)
 
 ## Funktionen
 
@@ -62,6 +62,36 @@ Eigenes Ziel:
 FS25_MODS_DIR=/pfad/zu/mods ./build.sh
 ```
 
+## Debug (Feldberater)
+
+Funktioniert unter **Windows, macOS und Linux** (inkl. Steam/Proton). Nutzen, wenn ein Feld falsche Kultur, Erntemonat oder Gras-Logistik in der Übersicht zeigt.
+
+| Eingabe | Aktion |
+| ------- | ------ |
+| **F9** oder **Linke Strg + F9** | Giants-Entwicklerkonsole öffnen, sonst Mod-Dialog |
+| `ftdlHelp` | Debug-Befehle anzeigen |
+| `ftdlDump 63` | Ein Feld in `log.txt` ausgeben (Feld-ID anpassen) |
+| `ftdlFruits` | Fruchtarten und Erntewachstumsstufen |
+| `ftdlAll` | Alle eigenen Felder |
+
+**Logdatei** (`log.txt` im FS25-Benutzerordner):
+
+| Plattform | Pfad |
+| --------- | ---- |
+| Windows | `%USERPROFILE%\Documents\My Games\FarmingSimulator2025\log.txt` |
+| macOS | `~/Library/Application Support/FarmingSimulator2025/log.txt` |
+| Linux (Steam / Proton) | `~/.local/share/Steam/steamapps/compatdata/2300320/pfx/drive_c/users/steamuser/Documents/My Games/FarmingSimulator2025/log.txt` |
+
+Nach `[FS25_FieldToDoList] DUMP` suchen. Wichtig: `meadowPhase`, `grassResidue`, `grassCrossScan`, `heightReader`, `harvestState`.
+
+Beispiel:
+
+```text
+ftdlDump 63
+```
+
+Kein Auto-Dump beim Menü — nur manuell.
+
 ## Mitwirken
 
 Beiträge sind willkommen (Bugfixes, Features, Übersetzungen).
@@ -72,11 +102,11 @@ Beiträge sind willkommen (Bugfixes, Features, Übersetzungen).
 
 ## Changelog
 
-Siehe [CHANGELOG.md](CHANGELOG.md). **0.1.0.3:** Live-Feldstatus, verbesserte Gras-/Wiesen-Vorschläge, Proton-sicheres Speichern (kein `fields.xml` zur Laufzeit), Stabilitätsfix für die Feldübersicht.
+Siehe [CHANGELOG.md](CHANGELOG.md). **0.1.0.4:** Debug-Befehle (`ftdlDump`), Gras-Kreuzscan für Schwaden, Ernte-/Nachwuchs-Labels, Unkraut-5%-Regel, Berater-Stabilität.
 
 ## Bekannte Punkte / WIP
 
-- Grass-Workflow: Randfälle (z. B. Klassifikation direkt nach dem Pflügen) werden noch nachgeschärft.
+- Gras Schwaden → Sammeln/Ballen wird auf manchen Maps noch nachgeschärft (Proton ohne `DensityMapHeightUtil`).
 - Auto-Completion ist insgesamt noch in Arbeit und braucht breitere Tests auf realen Spielständen.
 
 ## Issues

@@ -14,6 +14,9 @@ Dieses Skill koordiniert ein strukturiertes Audit der Mod. Es delegiert die
 Prüf-Dimensionen an **parallele, readonly Subagenten** (`Task`, `subagent_type: explore`)
 und fasst deren Befunde zu einem Report zusammen.
 
+**Quelle der Wahrheit:** `.cursor/rules/fs25-project-memory.mdc` — bei Widersprüchen
+zwischen diesem Skill und den Projektregeln gelten die Regeln.
+
 ## Wann verwenden
 - Voll-Audit der Mod oder eines geänderten Bereichs (z. B. nach einem Refactor).
 - Wenn der User „audit / prüfen / review / check / schau mal drüber" zur Mod sagt.
@@ -51,55 +54,69 @@ Dateien: alle `scripts/*.lua`, v. a. `FieldSavegameReader.lua`, `ToDoManager.lua
 - Kein `goto` / `::label::` (Giants-Runtime ist Lua-5.1-Stil → Datei lädt sonst nicht).
 - Kein Laufzeit-Lesen von `savegame*/fields.xml`: `FieldSavegameReader.ENABLE_DISK_READ`
   muss `false` bleiben; `deferReadsUntilGameplay` aktiv; Save/Load-Guards intakt.
+- `deferDiskReads` nur clearen wenn `ENABLE_DISK_READ == true`.
 - Keine SCS-Feldmap-Loops (`buildFieldMap`/`enumerateFields`) in Menü-/Update-Pfaden.
 - Keine wiederholten/Schleifen-Datei-Reads in Menü-/Update-Pfaden; Live-`FieldState`/Engine bevorzugen.
 - `Logging.info`/`Logging.warning` statt `print()` (besonders `InGameMenuIntegration`).
 - Engine-Calls in `pcall`; keine harten Crashes bei `nil` Globals.
+- Debug: **F9** / `ftdlDump` nur manuell — kein Auto-Dump in Menü-/Load-Pfaden.
 
 ### 2. Engine-API-Korrektheit
 Fokus: jede Verwendung von FS-Globals/Manager-APIs.
 - **Statische Funktionen ohne `self` aufrufen.** Z. B. `FSDensityMapUtil.getFruitTypeIndexAtWorldPos(x, z)`
   und `DensityMapHeightUtil.getFillLevelAtArea(...)` sind plain functions – NICHT
   `pcall(fn, util, x, z)` (das schiebt `util` als 1. Argument rein). Echte Bug-Klasse.
-- Manager-Methoden mit `:`/self korrekt (`g_fruitTypeManager:getFruitTypeByIndex(i)`).
-- Argument-Anzahl & -Reihenfolge gegen erwartete Signatur prüfen.
-- `rawget(_G, "X")`-Guard vor optionalen Globals (PF, SCS, FSDensityMapUtil).
+- Parallelogramm für `getFillLevelAtArea`: **6 Koordinaten** (x0,z0, x1,z1, x2,z2).
+- Manager-Methoden mit `:`/self korrekt; `g_fruitTypeManager`/`g_fillTypeManager` nil-guarded.
+- `rawget(_G, "FSDensityMapUtil")` vor optionalen Globals (Proton: oft nil).
+- `DensityMapHeightUtil`-Calls in Proben-Loops mit `pcall` absichern.
 - Rückgaben mit `tonumber`/Typprüfung absichern; `pcall`-`ok` auswerten.
 
 ### 3. Feld- & Frucht-Klassifikation
 Dateien: `FieldAdvisor.lua` (`classifyProbe`, `aggregateFieldProbes`,
 `resolveGrassFruitTypeIndex`, `refineGrassFruitTypeIndex`, `getFieldFruitDisplayLabel`,
 `getLocalizedFruitTitle`), `FieldScanner.lua`.
-- Mehrschichtig (`arable`/`grass`/`bare_soil`/`unknown`) auf Basis **mehrerer** Proben,
-  nicht nur Center-Sample; Aggregation + dominante Situation.
-- Kein blind-grass-Fallback auf bearbeitetem Boden: `PLOWED`/`CULTIVATED`/`SEEDBED`
-  ohne aktive Frucht → Frucht `-`, nicht Gras. Frisch gepflügt leer ≠ Gras (Feld-14-Klasse).
-- Spezifische Gras-Frucht (Luzerne/Alfalfa/Klee) gewinnt vor generischem GRASS
-  (`isGenericGrassFruitIndex`); `FSDensityMapUtil` + Feld-Metadaten als Quelle.
-- Anzeige: spezifische Gras-Frucht darf in `getLocalizedFruitTitle` nicht zu „Gras"
-  kollabieren (FillType-Titel vs. fruchteigener Name).
+- Mehrschichtig (`arable`/`grass`/`bare_soil`/`unknown`) auf Basis **mehrerer** Proben.
+- **Zwei Probe-Rollen:** `representativeState` = höchstes Wachstum (Phase/Vorschläge);
+  `harvestState` = **Feldmittelpunkt** für Ernte-Monat — nie max-Growth-Rand (Jul) oder
+  min-Growth-Rand ohne Fruit (→ „Wächst“ ohne Prognose).
+- Operator-Präzedenz bei `(worldX == nil or worldZ == nil) and …` — Klammern setzen.
+- Dominanz bei Gleichstand deterministisch (Center-Tie-Break oder feste Priorität).
+- Kein blind-grass-Fallback auf bearbeitetem Boden → Frucht `-` (Feld-14-Klasse).
+- Spezifische Gras-Frucht (Luzerne/Klee) gewinnt vor generischem GRASS; bei
+  `fieldHasPartialSoilWork` spezifischen Namen behalten, nicht „Gras (teilw. bearb.)“.
+- `clearStaleGrassMetadata` muss Engine-Gras-Flags (`isGrass`/`isGrassCrop`) mit löschen.
+- `FieldScanner:getFruitName` veraltet — Overview nutzt `buildFieldLabels`/`getFieldFruitDisplayLabel`.
 
 ### 4. Ernte- & Wachstumslogik
 Dateien: `FieldAdvisor.lua` (`evaluateFruitGrowth`, `isCropHarvestReady`,
-`getExpectedHarvestPeriod`, `getHarvestWindowHint`, `getCalendarMonthForSeasonPeriod`,
-`getCurrentSeasonPeriod`, `isSeasonalGrowthEnabled`).
-- Erntereife über `FruitTypeDesc`-APIs (`getIsHarvestReady`, `getIsHarvestable`,
-  `getIsCut`, `getIsGrowing`, `getIsWithered`) + min/max-Harvesting-Fallback.
-- **Saison-Periode (1..12) ≠ Kalendermonat** – Mapping über `getCalendarMonthForSeasonPeriod`,
-  nie Periodenindex direkt als Monat ausgeben.
-- Erntemonat zielt auf **volle Reife** (`maxHarvestingGrowthState`), nicht auf das
-  frühe Futterfenster (z. B. Grünmais im Sommer). seasonal vs. non-seasonal getrennt.
+`getExpectedHarvestPeriod`, `getHarvestWindowHint`, `isFruitPrimaryHarvestInPeriod`,
+`resolveHarvestFieldState`, `getCalendarMonthForSeasonPeriod`).
+- Erntereife über `FruitTypeDesc`-APIs + min/max-Harvesting-Fallback.
+- **Saison-Periode (1..12) ≠ Kalendermonat** — `getCalendarMonthForSeasonPeriod`
+  (period 5=Jul, 8=Okt, …).
+- Dual-window crops (maize): `getIsHarvestableInPeriod` allein reicht **nicht** —
+  **`isFruitPrimaryHarvestInPeriod`** mit projiziertem Wachstum + **`getIsHarvestReady`**
+  (nicht `getIsHarvestable` / Silage-Fenster). Bei `getIsHarvestReady`-API: kein
+  `projectedGrowth <= 0` → true ohne Projection.
+- ETA zielt auf **`minHarvestingGrowthState`** bzw. ersten `getIsHarvestReady`-State,
+  nicht `maxHarvestingGrowthState` (tot/verdorrt).
+- `isCropHarvestReady` saisonal: Primary-Harvest-Perioden-Check, nicht nur Silage-Fenster.
+- Kein unsicherer Letztfallback `getNextHarvestablePeriod` ohne Growth-Projection.
+- `getGrassHarvestWindowLabel` nutzt `resolveHarvestFieldState` (Center).
 - `isWithered` → Pflügen/Walzen bleiben in Auto-Complete-Checks unfertig.
 
 ### 5. Unkraut & Gras-Logistik
 Dateien: `FieldAdvisor.lua` (Weed-/Residue-Funktionen), `FieldTaskCompletion.lua`.
-- 5%-Regel: lebendes Unkraut ≤ 5 % → erledigt (`WEED_LIVE_RATIO_DONE_THRESHOLD`).
-- Tot/gesprüht erkennen: hoher `weedState` (≥ `WEED_STATE_DEAD_MIN`) bzw. Spritzrest
-  ist totes Unkraut, nicht lebend. Feld-weite Abdeckung statt nur Center-Probe.
-- Gras-Reststoff-Fluss `loose → swath → (collect/bale/silage) → bale_collect`
-  aus Live-Daten (`DensityMapHeightUtil` + Windrow-Fill), kein generischer Rest-Zustand.
-- Ballen nur innerhalb des Feldpolygons zählen (field-local).
-- Auto-Complete nutzt dieselben Residue-/Bale-Signale wie die Vorschläge.
+- `WEED_STATE_DEAD_MIN = 6`; Coverage-first wenn `weedSummary.classified > 0`.
+- 5%-Regel: `WEED_LIVE_RATIO_DONE_THRESHOLD`; dead/live **exklusiv** pro Probe zählen.
+- Mehrdeutige Proben (weder dead noch live) nicht künstlich „erledigt“ wirken lassen.
+- `FieldTaskCompletion` Weed: bei Coverage nur `isWeedTaskDoneByCoverage`.
+- Gras-Reststoff: `loose → swath → (collect/bale/silage) → bale_collect` aus Live-Daten.
+- `DensityMapHeightUtil` nil (Proton): Residue-Tasks/Progress nicht als `NONE`=leer werten.
+- `grass_swath` complete nur bei `SWATH`/`BALED`, nicht bei `NONE`.
+- `hasCompletionProgress` für Gras: braucht `grassResidueSummary`/`baleSummary` im Context.
+- Ballen nur innerhalb Feldpolygon; Auto-Complete = gleiche Signale wie Vorschläge.
 
 ### 6. UI / To-Do / HUD
 Dateien: `gui/FieldToDoMenuFrame.lua` + `.xml`, `ToDoManager.lua`,
@@ -107,9 +124,19 @@ Dateien: `gui/FieldToDoMenuFrame.lua` + `.xml`, `ToDoManager.lua`,
 - To-Do-Reihenfolge per `sortIndex` (User-Order), nicht Work-Order-Presets.
 - Hoch/Runter: verschobene Task bleibt selektiert; nach Delete Selektion clearen.
 - SmoothList-Reload-Guard (`ignoreTaskSelectionChanged`), Sync per Task-ID statt Row-Index.
-- Mini-Button-Labels `Hoch`/`Runter`; kein Drag-and-drop.
-- HUD: nur manuelle Tasks (`getManualTasksForDisplay`), max 5 offene; schlichtes Panel.
+- Mini-Button Hoch/Runter: Pfeil-Icons (↑/↓) mit L10n-Tooltip (`$l10n_ftdl_btn_up`/`down`), kein Drag-and-drop.
+- HUD: nur **offene** manuelle Tasks (`getManualTasksForDisplay`), max 5 — kein Fallback auf erledigte.
 - Offene Tasks über erledigten; erledigte cap 10; neueste erledigte oben.
+
+---
+
+## Regression-Checkliste (nach Advisor-Refactor)
+- Feld 14: frisch gepflügt leer → `-`, nicht Gras.
+- Luzerne gemäht: kein erneutes Mähen; Label **Luzerne**, nicht „Gras (teilw. bearb.)“.
+- Field 15 Körnermais (growth=1, April): **Ernte Okt**, nicht Jul / nicht nur „Wächst“.
+- Field 9 gespritzter Weizen: Unkraut **tot**, keine Combat-Empfehlung bei ≤5 % live.
+- Gras-Logistik: `loose → swath → collect/bale → bale_collect` konsistent.
+- `ftdlDump` vs UI: Ernte-Monat muss übereinstimmen (Center-Probe).
 
 ---
 
@@ -132,7 +159,7 @@ Bei Diff-Audit zusätzlich: „Beschränke dich auf diese geänderten Stellen: <
 
 ## Schweregrade
 - 🔴 **Bug**: falsches Verhalten / Crash-/Save-Risiko (z. B. Runtime-`fields.xml`-Read,
-  Static-Call mit `self`, Saison-Periode als Monat).
+  Static-Call mit `self`, Silage-Fenster als Körner-Ernte, `NONE`-Residue als complete).
 - 🟠 **Risiko**: fragil / Regressionsgefahr (fehlender `pcall`, Loop-Reads in Menüpfad).
 - 🟡 **Verbesserung**: Logik-/Lesbarkeits-Schliff, Doppelpfade.
 - ⚪ **Hinweis**: Stil, Doku, Kleinigkeiten.

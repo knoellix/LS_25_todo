@@ -54,11 +54,13 @@
 
                     <Bitmap profile="ftdlMiniBtnBgNarrow" position="126px -616px"/>
                     <Text profile="ftdlMiniBtnTextNarrow" position="126px -616px" text="↑"/>
-                    <Button profile="ftdlMiniBtnHitNarrow" position="126px -616px" onClick="onClickMoveTaskUp"/>
+                    <Button profile="ftdlMiniBtnHitNarrow" id="btnMoveUp" position="126px -616px"
+                            onClick="onClickMoveTaskUp" toolTipText="$l10n_ftdl_btn_up"/>
 
                     <Bitmap profile="ftdlMiniBtnBgNarrow" position="190px -616px"/>
                     <Text profile="ftdlMiniBtnTextNarrow" position="190px -616px" text="↓"/>
-                    <Button profile="ftdlMiniBtnHitNarrow" position="190px -616px" onClick="onClickMoveTaskDown"/>
+                    <Button profile="ftdlMiniBtnHitNarrow" id="btnMoveDown" position="190px -616px"
+                            onClick="onClickMoveTaskDown" toolTipText="$l10n_ftdl_btn_down"/>
                 </GuiElement>
             </ThreePartBitmap>
 
