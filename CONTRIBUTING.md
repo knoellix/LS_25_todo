@@ -2,6 +2,8 @@
 
 Thanks for helping improve this mod.
 
+This project follows the [Code of Conduct](CODE_OF_CONDUCT.md). Security-sensitive reports belong in [SECURITY.md](SECURITY.md), not public issues.
+
 ## Quick Start
 
 - Fork the repository and create a feature branch.
