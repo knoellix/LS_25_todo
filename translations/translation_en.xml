@@ -2,6 +2,8 @@
 <l10n>
     <texts>
         <text name="input_FTDTL_TOGGLE_TODO_HUD" text="Toggle To-Do HUD"/>
+        <text name="input_FTDTL_DEBUG_CONSOLE" text="Debug console"/>
+        <text name="ftdl_dialog_debug_console_title" text="Field To-Do debug console"/>
         <text name="ftdl_hud_title" text="Tasks"/>
         <text name="ftdl_hud_empty" text="No tasks"/>
 
@@ -80,9 +82,10 @@
         <text name="ftdl_action_grass_mow" text="Mow"/>
         <text name="ftdl_action_grass_mow_short" text="Mow"/>
         <text name="ftdl_action_grass_swath" text="Swath"/>
-        <text name="ftdl_action_grass_collect" text="Collect / load"/>
+        <text name="ftdl_action_grass_collect" text="Collect hay (forage wagon)"/>
         <text name="ftdl_action_grass_bale" text="Bale"/>
         <text name="ftdl_action_grass_silage_bale" text="Silage bale"/>
+        <text name="ftdl_action_grass_bale_collect" text="Collect bales"/>
         <text name="ftdl_action_withered" text="Withered"/>
         <text name="ftdl_action_stones" text="Stones"/>
         <text name="ftdl_action_cultivate" text="Cultivate"/>

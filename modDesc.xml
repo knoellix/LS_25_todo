@@ -46,11 +46,16 @@ Version 0.1.0.3 — Vorab-Entwicklung.
 
     <actions>
         <action name="FTDTL_TOGGLE_TODO_HUD"/>
+        <action name="FTDTL_DEBUG_CONSOLE"/>
     </actions>
 
     <inputBinding>
         <actionBinding action="FTDTL_TOGGLE_TODO_HUD">
             <binding device="KB_MOUSE_DEFAULT" input="KEY_lctrl KEY_f5"/>
+        </actionBinding>
+        <actionBinding action="FTDTL_DEBUG_CONSOLE">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_f9"/>
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_lctrl KEY_f9"/>
         </actionBinding>
     </inputBinding>
 
@@ -71,6 +76,9 @@ Version 0.1.0.3 — Vorab-Entwicklung.
         <sourceFile filename="scripts/FieldAdvisor.lua"/>
         <sourceFile filename="scripts/FieldScanner.lua"/>
         <sourceFile filename="scripts/FieldVisit.lua"/>
+        <sourceFile filename="scripts/FieldDebugDump.lua"/>
+        <sourceFile filename="scripts/FieldDebugConsole.lua"/>
+        <sourceFile filename="scripts/FieldDebugConsoleInput.lua"/>
         <sourceFile filename="scripts/ToDoManager.lua"/>
         <sourceFile filename="scripts/FieldToDoHudOverlay.lua"/>
         <sourceFile filename="scripts/FieldToDoHudInput.lua"/>

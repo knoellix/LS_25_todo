@@ -15,9 +15,10 @@ FieldWorkCatalog.PICKER_ACTIONS = {
     { actionType = "stones", l10nKey = "ftdl_action_stones", fallback = "Steine", autoComplete = true },
     { actionType = "grass_mow", l10nKey = "ftdl_action_grass_mow", fallback = "Mähen", autoComplete = true },
     { actionType = "grass_swath", l10nKey = "ftdl_action_grass_swath", fallback = "Schwaden", autoComplete = true },
-    { actionType = "grass_collect", l10nKey = "ftdl_action_grass_collect", fallback = "Einsammeln / Laden", autoComplete = true },
-    { actionType = "grass_bale", l10nKey = "ftdl_action_grass_bale", fallback = "Ballen pressen", autoComplete = false },
-    { actionType = "grass_silage_bale", l10nKey = "ftdl_action_grass_silage_bale", fallback = "Silageballen pressen", autoComplete = false },
+    { actionType = "grass_collect", l10nKey = "ftdl_action_grass_collect", fallback = "Heu sammeln (Ladewagen)", autoComplete = true },
+    { actionType = "grass_bale", l10nKey = "ftdl_action_grass_bale", fallback = "Ballen pressen", autoComplete = true },
+    { actionType = "grass_silage_bale", l10nKey = "ftdl_action_grass_silage_bale", fallback = "Silageballen pressen", autoComplete = true },
+    { actionType = "grass_bale_collect", l10nKey = "ftdl_action_grass_bale_collect", fallback = "Ballen einsammeln", autoComplete = true },
     { actionType = "harvest", l10nKey = "ftdl_action_harvest", fallback = "Ernten", autoComplete = true },
 }
 

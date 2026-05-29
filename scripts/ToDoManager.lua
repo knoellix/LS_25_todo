@@ -891,6 +891,14 @@ local function load(mission)
         FieldToDoHudOverlay.instance = FieldToDoHudOverlay.new()
         FieldToDoHudOverlay.instance:initialize()
     end
+
+    if FieldDebugDump ~= nil and FieldDebugDump.register ~= nil then
+        FieldDebugDump.register()
+    end
+
+    if FieldDebugConsole ~= nil and FieldDebugConsole.register ~= nil then
+        FieldDebugConsole.register()
+    end
 end
 
 local function unload()
@@ -904,6 +912,14 @@ local function unload()
     if FieldToDoHudOverlay ~= nil and FieldToDoHudOverlay.instance ~= nil then
         FieldToDoHudOverlay.instance:delete()
         FieldToDoHudOverlay.instance = nil
+    end
+
+    if FieldDebugDump ~= nil and FieldDebugDump.unregister ~= nil then
+        FieldDebugDump.unregister()
+    end
+
+    if FieldDebugConsole ~= nil and FieldDebugConsole.unregister ~= nil then
+        FieldDebugConsole.unregister()
     end
 
     if g_currentMission ~= nil then

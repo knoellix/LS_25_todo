@@ -44,8 +44,47 @@ alwaysApply: true
 - `moveTask` must not cross open/completed boundaries.
 - While `isWithered`, keep plow and roller incomplete in auto-complete checks.
 - For organic mode display, use `getWorkOrderDisplayLabel()` (not preset label).
+- Field classification must be multi-layered (`arable` / `grass` / `bare_soil` / `unknown`) and based on **multiple in-field probes**, not a single center sample.
+- Prefer probe aggregation + dominant situation in overview labels/suggestions (`aggregateFieldProbes` + representative state), with center probe as tie-breaker.
+  - **Harvest month uses the field center probe** (`aggregation.harvestState` = center) — not max-growth edges (maize silage → Jul) and not min-growth edge strips (growth 0 / missing fruit → „Wächst“ with no prognosis).
+- Never use a blind default-grass fallback on bare worked soil: on `PLOWED`/`CULTIVATED`/`SEEDBED` without active crop, show crop as `-` and do not collapse to grass.
+- Specific grass crops (Luzerne/Klee/Alfalfa): keep localized fruit name even when `fieldHasPartialSoilWork` — do not collapse to generic „Gras (teilw. bearb.)“ when probes resolved a non-generic index.
+- Plow recommendation must align with completion logic: `PLOWED` + `needsPlowing == false` means plowing done (ignore stale `plowLevel > 0` alone).
+- Grass/meadow post-mow handling: if `isCut`, do **not** suggest mow again; show regrowth / harvest-window and follow-up logistics (swath/collect/bale).
+- For harvest readiness (vanilla + mod fruits), rely on `FruitTypeDesc` growth APIs (`getIsHarvestable`, `getIsHarvestReady`, `getIsCut`, `getIsGrowing`, `getIsWithered`) with min/max harvesting-state fallback.
+- **Harvest month (Ernte-Spalte / Vorschlag):**
+  - FS25 season period (1..12) ≠ calendar month — map via `getCalendarMonthForSeasonPeriod` (period 5=Jul, 8=Okt, …).
+  - Dual-window crops (maize): `getIsHarvestableInPeriod` is true from **July** (silage/forage, growth ~5) and again in **autumn** (grain, growth 7 `getIsHarvestReady`). UI must use **`isFruitPrimaryHarvestInPeriod`** (projected growth + `getIsHarvestReady`), not the first harvestable period alone.
+  - ETA steps target **`minHarvestingGrowthState`** when `getIsHarvestReady` exists (grain-ready), not `maxHarvestingGrowthState` (may include dead/withered).
+  - Always pass **`aggregation.harvestState`** (via `resolveHarvestFieldState`) into harvest-window helpers — not `representativeState`.
+- Grass residue flow must distinguish `loose` vs `swath` vs `baled` vs `none` from live map data (`DensityMapHeightUtil` + windrow fill levels), not a single generic grass-rest state.
+- Post-mow suggestions must follow residue state:
+  - `loose` -> `grass_swath`
+  - `swath` -> show all three options (`grass_collect`/Ladewagen, `grass_bale`, `grass_silage_bale`)
+  - `baled` -> `grass_bale_collect`.
+- Auto-completion for grass logistics must use the same residue/bale signals as suggestions (no separate heuristic branch).
+- Bale follow-up is field-local: count only bales physically inside the field polygon.
+- Weed done rule: if dead/sprayed weeds exist on field probes and live weed coverage is <= 5%, treat weed tasks as done (no new weed combat/watch suggestion).
+- **Weed detection details:**
+  - `WEED_STATE_DEAD_MIN = 6` (FS25 `weed.xml`: states 0–5 alive/sprayed-visible, **6+ dead** — state 6 „small dead“ is not live).
+  - When `weedSummary.total > 0`, **coverage wins** for display, suggestions, auto-complete, and progress — do not let center `isWeedDeadOrSprayed` override live coverage (or vice versa).
+  - `sampleWeedCoverage`: count dead vs live **mutually exclusive** per probe (`isWeedProbeDead` first, then live only if not dead).
+  - `FieldTaskCompletion` weed tasks: if coverage exists, complete only via `isWeedTaskDoneByCoverage`.
 
-## Known Open Bug (Next Session)
+## Debug (Proton-friendly)
 
-- Field 14 can still be misclassified as grass after plowing.
-- Priority fix area: `FieldAdvisor.isGrassFieldState` and `getEnrichedFieldState` so live `PLOWED` wins over stale grass metadata.
+- Manual only: **F9** (or LCtrl+F9) → `FieldDebugConsole` / `ftdlDump <id>`, `ftdlAll`, `ftdlHelp`. **No auto-dump** on menu open, save load, or row click.
+- Log tag: `[FS25_FieldToDoList] DUMP` in `log.txt`.
+- Useful dump lines: `weedCoverage`, `harvestState` vs `representativeState`, `getHarvestWindowHint`, `harvestProjection`.
+- `FSDensityMapUtil` may be **nil as global** under Proton — fruit/weed still work via `FieldState` probes; do not rely on density-map globals in menu paths.
+- If dump and UI disagree on Ernte month: compare center/harvestState growth vs representative (max-growth) probe.
+
+## Validation Focus (Field Overview)
+
+- Regression-check every advisor refactor with representative saves:
+  - freshly plowed empty field must not render as grass (e.g. Field 14 class of bug),
+  - mown lucerne/alfalfa must not suggest mow again (show regrowth/next window); label must stay **Luzerne**, not „Gras (teilw. bearb.)“,
+  - harvest-ready cereals (e.g. wheat) must be flagged harvest-ready in overview,
+  - grass logistics chain must be consistent (`loose` -> `swath` -> collect/bale -> bale_collect),
+  - **Körnermais** early season (center growth=1, April): Ernte **Okt**, not Jul (silage window),
+  - **sprayed wheat** with dead weed probes (e.g. Field 9): Unkraut **tot**, no combat/watch suggestion when live coverage <= 5%.

@@ -42,14 +42,14 @@ FieldTaskCompletion.REGISTRY = {
         strategy = "sample",
         coverageOnly = true,
     },
-    -- grass_swath / grass_collect: no windrow in fieldState; 98% grid + baseline heuristics in isActionComplete.
+    -- grass residue flow tracked via density-map windrow fill levels.
     grass_mow = {
         strategy = "grass",
         grassStep = "mow",
         coverageOnly = true,
     },
-    grass_swath = { strategy = "none" },
-    grass_collect = { strategy = "none" },
+    grass_swath = { strategy = "point" },
+    grass_collect = { strategy = "point" },
     harvest = { strategy = "point" },
     weed_combat = { strategy = "point" },
     weed_watch = { strategy = "point" },
@@ -59,8 +59,9 @@ FieldTaskCompletion.REGISTRY = {
     scs_stress_high = { strategy = "point" },
     scs_stress_watch = { strategy = "point" },
     withered = { strategy = "point" },
-    grass_bale = { strategy = "none" },
-    grass_silage_bale = { strategy = "none" },
+    grass_bale = { strategy = "point" },
+    grass_silage_bale = { strategy = "point" },
+    grass_bale_collect = { strategy = "point" },
 }
 
 --- Register or override a completion strategy (e.g. mod extensions, new fruit workflows).
@@ -390,6 +391,10 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
             return true
         end
 
+        if context.weedSummary ~= nil and context.weedSummary.total > 0 then
+            return FieldAdvisor.isWeedTaskDoneByCoverage(context.weedSummary)
+        end
+
         return FieldAdvisor.isWeedDeadOrSprayed(fieldState)
             or FieldAdvisor.getEffectiveWeedPressure(fieldState) <= FieldAdvisor.WEED_FACTOR_COMPLETE_THRESHOLD
     end
@@ -489,8 +494,13 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
         return FieldAdvisor.isGrassCut(fieldState, field)
     end
 
-    -- No reliable windrow marker in fieldState; baseline heuristics only.
     if actionType == "grass_swath" then
+        local residueSummary = context.grassResidueSummary
+        if residueSummary ~= nil then
+            return residueSummary.residueState == FieldAdvisor.GRASS_RESIDUE_SWATH
+                or residueSummary.residueState == FieldAdvisor.GRASS_RESIDUE_NONE
+        end
+
         if not FieldAdvisor.isGrassCut(fieldState, field) then
             return false
         end
@@ -514,13 +524,36 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
         return false
     end
 
-    -- No reliable windrow marker in fieldState; baseline heuristics only.
     if actionType == "grass_collect" then
+        local residueSummary = context.grassResidueSummary
+        if residueSummary ~= nil then
+            return residueSummary.residueState == FieldAdvisor.GRASS_RESIDUE_NONE
+        end
+
         local baseline = actionMeta ~= nil and actionMeta.completionBaseline or nil
         return FieldAdvisor.isGrassPostCutCleared(fieldState, baseline, field)
     end
 
     if actionType == "grass_bale" or actionType == "grass_silage_bale" then
+        local residueSummary = context.grassResidueSummary
+        local baleSummary = context.baleSummary
+        local baseline = actionMeta ~= nil and actionMeta.completionBaseline or nil
+        local baselineBales = baseline ~= nil and tonumber(baseline.baleCount) or 0
+
+        if residueSummary ~= nil and baleSummary ~= nil then
+            return residueSummary.residueState ~= FieldAdvisor.GRASS_RESIDUE_SWATH
+                and tonumber(baleSummary.total or 0) > baselineBales
+        end
+
+        return false
+    end
+
+    if actionType == "grass_bale_collect" then
+        local baleSummary = context.baleSummary
+        if baleSummary ~= nil then
+            return tonumber(baleSummary.total or 0) <= 0
+        end
+
         return false
     end
 
