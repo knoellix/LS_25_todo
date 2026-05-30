@@ -359,6 +359,9 @@ function FieldToDoMenuFrame:onFrameUpdate(dt)
         if manager:consumeOwnedFieldsOverviewStale() then
             self:refreshLists(true)
         end
+        if manager.consumeManualTasksDirty ~= nil and manager:consumeManualTasksDirty() then
+            self:refreshManualTaskList(true)
+        end
         self:syncOwnedFieldsFromScan()
         self:updateFieldScanIndicator(dt, manager)
     end
@@ -369,7 +372,7 @@ function FieldToDoMenuFrame:onFrameUpdate(dt)
             self.deferredListReloadTimer = 0
             self.deferredListReloadAttempts = self.deferredListReloadAttempts + 1
             self:pushMenuButtons()
-            self:refreshLists(false)
+            self:syncOwnedFieldsFromScan()
             local deferredManager = self:getManager()
             local hasFields = deferredManager ~= nil and #self.ownedFields > 0
             if hasFields or self.deferredListReloadAttempts >= 30 then
@@ -390,22 +393,12 @@ function FieldToDoMenuFrame:onFrameUpdate(dt)
     end
 
     self.listRefreshTimer = 0
-    local completedCount = manager:updateAutoCompletion()
 
     self.fieldRescanTimer = (self.fieldRescanTimer or 0) + 1000
     local rescanMs = ToDoManager.OWNED_FIELDS_MENU_RESCAN_MS or 15000
-    local shouldRescanFields = self.fieldRescanTimer >= rescanMs
-    if shouldRescanFields then
+    if self.fieldRescanTimer >= rescanMs then
         self.fieldRescanTimer = 0
-    end
-
-    if completedCount > 0 or shouldRescanFields then
-        if completedCount > 0 and not shouldRescanFields then
-            self:refreshManualTaskList()
-            self:syncOwnedFieldsFromScan()
-        else
-            self:refreshLists(shouldRescanFields)
-        end
+        self:refreshLists(true)
     end
 end
 
@@ -468,17 +461,25 @@ function FieldToDoMenuFrame:refreshLists(invalidateFieldsCache)
     end
 
     if self.fieldList ~= nil then
+        if invalidateFieldsCache == false and manager ~= nil and manager.consumeOwnedFieldsScanDirty ~= nil then
+            if not manager:consumeOwnedFieldsScanDirty() then
+                return
+            end
+        end
         self.fieldList:reloadData()
     end
 end
 
 --- Refresh manual tasks only (order/text). Keeps selectedTaskId; used after move/toggle.
-function FieldToDoMenuFrame:refreshManualTaskList()
+---@param skipAutoCheck boolean|nil
+function FieldToDoMenuFrame:refreshManualTaskList(skipAutoCheck)
     local manager = self:getManager()
     if manager == nil then
         self.manualTasks = {}
     else
-        manager:updateAutoCompletion()
+        if skipAutoCheck ~= true then
+            manager:updateAutoCompletion()
+        end
         self.manualTasks = manager:getManualTasks()
     end
 
@@ -1029,7 +1030,7 @@ function FieldToDoMenuFrame:onClickAdoptFieldSuggestion()
     end
 
     self.selectedTaskId = task.id
-    self:refreshLists()
+    self:refreshManualTaskList()
 end
 
 function FieldToDoMenuFrame:resetFieldSuggestionIndices()
@@ -1318,7 +1319,7 @@ function FieldToDoMenuFrame:onFieldTaskActionPicked(...)
     end
 
     self.selectedTaskId = task.id
-    self:refreshLists()
+    self:refreshManualTaskList()
 end
 
 ---@param text string|nil
@@ -1341,7 +1342,7 @@ function FieldToDoMenuFrame:onAddFieldTaskDialog(text, clickOk)
         self.selectedTaskId = task.id
     end
 
-    self:refreshLists()
+    self:refreshManualTaskList()
 end
 
 ---@param listIndex number|nil
@@ -1430,7 +1431,7 @@ function FieldToDoMenuFrame:onAddTaskDialog(text, clickOk)
         self.selectedTaskId = task.id
     end
 
-    self:refreshLists()
+    self:refreshManualTaskList()
 end
 
 ---@param text string|nil
@@ -1450,7 +1451,7 @@ function FieldToDoMenuFrame:onEditTaskDialog(text, clickOk)
 
     manager:updateManualTask(taskId, text)
     self.selectedTaskId = taskId
-    self:refreshLists()
+    self:refreshManualTaskList()
 end
 
 function FieldToDoMenuFrame:onClickAddTask()
@@ -1518,7 +1519,7 @@ function FieldToDoMenuFrame:onConfirmDeleteTask(yes)
 
     manager:deleteManualTask(taskId)
     self.selectedTaskId = nil
-    self:refreshLists()
+    self:refreshManualTaskList()
 end
 
 function FieldToDoMenuFrame:onClickToggleTask()

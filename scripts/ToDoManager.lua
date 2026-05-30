@@ -18,8 +18,8 @@ ToDoManager.XML_KEY = "fieldToDoList"
 ToDoManager.XML_FILENAME = "fieldToDoList.xml"
 ToDoManager.AUTO_CHECK_INTERVAL_MS = 1000
 ToDoManager.OWNED_FIELDS_CACHE_MS = 4000
-ToDoManager.OWNED_FIELDS_SCAN_BATCH_SIZE = 2
-ToDoManager.OWNED_FIELDS_SCAN_INTERVAL_MS = 50
+ToDoManager.OWNED_FIELDS_SCAN_BATCH_SIZE = 5
+ToDoManager.OWNED_FIELDS_SCAN_INTERVAL_MS = 40
 ToDoManager.OWNED_FIELDS_MENU_RESCAN_MS = 15000
 ToDoManager.SAVE_DEBOUNCE_MS = 2000
 --- Keep at most this many completed rows; oldest completed (lowest sortIndex) is removed.
@@ -55,8 +55,23 @@ function ToDoManager.new(mission, modDirectory, modName)
     self.ownedFieldsCacheById = nil
     self.ownedFieldsScanDirty = false
     self.ownedFieldsOverviewStale = false
+    self.manualTasksDirty = false
 
     return self
+end
+
+function ToDoManager:markManualTasksDirty()
+    self.manualTasksDirty = true
+end
+
+---@return boolean
+function ToDoManager:consumeManualTasksDirty()
+    if self.manualTasksDirty ~= true then
+        return false
+    end
+
+    self.manualTasksDirty = false
+    return true
 end
 
 ---@param task table
@@ -497,7 +512,15 @@ function ToDoManager:advanceOwnedFieldsScan(maxBatch)
         local ok, record = pcall(function()
             return self.fieldScanner:normalizeField(candidate.field, candidate.forceInclude)
         end)
-        if ok and record ~= nil then
+        if not ok then
+            if FieldToDoLog ~= nil then
+                FieldToDoLog.warning(
+                    "Field overview scan error for field %s: %s",
+                    tostring(candidate.id),
+                    tostring(record)
+                )
+            end
+        elseif record ~= nil then
             if self.ownedFieldsCacheById == nil then
                 self.ownedFieldsCacheById = {}
             end
@@ -870,6 +893,7 @@ function ToDoManager:updateAutoCompletion()
 
     if completedCount > 0 then
         self:requestDebouncedSave()
+        self:markManualTasksDirty()
     end
 
     return completedCount
@@ -909,7 +933,7 @@ function ToDoManager:update(dt)
     end
 
     if self.ownedFieldsScanActive == true and self.ownedFieldsScanInProgress == true then
-        local scanChanged = self:tickOwnedFieldsScan(dt, 1)
+        local scanChanged = self:tickOwnedFieldsScan(dt, 2)
         if scanChanged and FieldToDoInGameMenuIntegration ~= nil
             and FieldToDoInGameMenuIntegration.syncFieldListFromScan ~= nil then
             FieldToDoInGameMenuIntegration.syncFieldListFromScan()

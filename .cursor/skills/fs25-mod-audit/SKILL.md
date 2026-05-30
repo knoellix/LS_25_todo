@@ -59,7 +59,7 @@ Dateien: alle `scripts/*.lua`, v. a. `FieldSavegameReader.lua`, `ToDoManager.lua
 - Keine wiederholten/Schleifen-Datei-Reads in Menü-/Update-Pfaden; Live-`FieldState`/Engine bevorzugen.
 - **Inkrementeller Feld-Scan:** kein synchrones Voll-`normalizeField` pro Menü-Refresh; Queue + Batch in `ToDoManager`.
 - **`deferredListReload` darf den Feld-Cache nicht invalidieren** (`refreshLists(false)`); nur expliziter Rescan (z. B. 5 s) mit `refreshLists(true)`.
-- Scan-Tick nur aus **`FieldToDoMenuFrame:onFrameUpdate`** (`tickOwnedFieldsScan`), nicht ungebremst in `ToDoManager:update` drainen.
+- Scan-Tick bei offenem Tab: `ToDoManager:tickOwnedFieldsScan(dt, 1)` in `ToDoManager:update` wenn `ownedFieldsScanActive`; UI-Sync zusätzlich aus `InGameMenu.update` / Menü-Frame — nicht ungebremst drainen.
 - `Logging.info`/`Logging.warning` statt `print()` (besonders `InGameMenuIntegration`).
 - Engine-Calls in `pcall`; keine harten Crashes bei `nil` Globals.
 - Debug: **F9** / `ftdlDump` nur manuell — kein Auto-Dump in Menü-/Load-Pfaden.
@@ -131,7 +131,7 @@ Dateien: `gui/FieldToDoMenuFrame.lua` + `.xml`, `ToDoManager.lua`,
 - HUD: nur **offene** manuelle Tasks (`getManualTasksForDisplay`), max 5 — kein Fallback auf erledigte.
 - Offene Tasks über erledigten; erledigte cap 10; neueste erledigte oben.
 - **Inkrementeller Feld-Scan (Performance):**
-  - `setOwnedFieldsScanActive` on menu open/close; `tickOwnedFieldsScan(dt, 1)` in `onFrameUpdate`.
+  - `setOwnedFieldsScanActive` on menu open/close; Scan-Tick in `ToDoManager:update` wenn Tab offen; UI-Sync via Menü-Frame/`syncFieldListFromScan`.
   - `syncOwnedFieldsFromScan` / `reloadData()` when scan dirty — not `reloadVisibleItems()` for placeholder → value updates.
   - `deferredListReload` → `refreshLists(false)` (must not call default invalidate every 500 ms).
   - Placeholders visible immediately; real labels fill batch-by-batch (not stuck on `...`, not instant full sync unless `getOwnedFields(true)`).

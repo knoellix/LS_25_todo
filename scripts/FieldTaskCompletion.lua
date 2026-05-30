@@ -426,7 +426,7 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
             return true
         end
 
-        if context.weedSummary ~= nil and (context.weedSummary.classified or 0) > 0 then
+        if context.weedSummary ~= nil and (context.weedSummary.total or 0) > 0 then
             return FieldAdvisor.isWeedTaskDoneByCoverage(context.weedSummary)
         end
 
@@ -537,26 +537,6 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
                 or residueSummary.residueState == FieldAdvisor.GRASS_RESIDUE_BALED
         end
 
-        if not FieldAdvisor.isGrassCut(fieldState, field) then
-            return false
-        end
-
-        local stubbleShredLevel = FieldAdvisor.getStateNumber(fieldState, "stubbleShredLevel")
-        local baseline = actionMeta ~= nil and actionMeta.completionBaseline or nil
-        if baseline ~= nil and stubbleShredLevel > (baseline.stubbleShredLevel or 0) then
-            return true
-        end
-
-        if baseline ~= nil then
-            if FieldAdvisor.getLastGrowthState(fieldState) ~= (baseline.lastGrowthState or -1) then
-                return true
-            end
-
-            if FieldAdvisor.getGrowthState(fieldState) ~= (baseline.growthState or -1) then
-                return true
-            end
-        end
-
         return false
     end
 
@@ -566,8 +546,7 @@ function FieldTaskCompletion.isActionComplete(actionType, context, actionMeta)
             return residueSummary.residueState == FieldAdvisor.GRASS_RESIDUE_NONE
         end
 
-        local baseline = actionMeta ~= nil and actionMeta.completionBaseline or nil
-        return FieldAdvisor.isGrassPostCutCleared(fieldState, baseline, field)
+        return false
     end
 
     if actionType == "grass_bale" or actionType == "grass_silage_bale" then

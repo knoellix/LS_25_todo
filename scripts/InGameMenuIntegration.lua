@@ -11,6 +11,7 @@ FieldToDoInGameMenuIntegration.XML_FILENAME = "gui/FieldToDoMenuFrame.xml"
 FieldToDoInGameMenuIntegration.MENU_ICON_PATH = "gui/menuIcon.dds"
 FieldToDoInGameMenuIntegration.MENU_ICON_UVS = { 0, 0, 1024, 1024 }
 FieldToDoInGameMenuIntegration.menuScreen = nil
+FieldToDoInGameMenuIntegration._menuFrameUpdateTime = nil
 
 local LOG_PREFIX = "[FS25_FieldToDoList]"
 local pendingRegistration = false
@@ -131,6 +132,12 @@ function FieldToDoInGameMenuIntegration.updateMenuFrame(menu, dt)
     if dt == nil or dt <= 0 then
         return
     end
+
+    local now = g_time
+    if now ~= nil and now == FieldToDoInGameMenuIntegration._menuFrameUpdateTime then
+        return
+    end
+    FieldToDoInGameMenuIntegration._menuFrameUpdateTime = now
 
     local screen = FieldToDoInGameMenuIntegration.menuScreen
     if screen == nil and menu ~= nil then
