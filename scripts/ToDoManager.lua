@@ -18,7 +18,9 @@ ToDoManager.XML_KEY = "fieldToDoList"
 ToDoManager.XML_FILENAME = "fieldToDoList.xml"
 ToDoManager.AUTO_CHECK_INTERVAL_MS = 1000
 ToDoManager.OWNED_FIELDS_CACHE_MS = 4000
+--- Fields per scan batch; menu tick runs up to 2 batches per frame (see FieldToDoMenuFrame:onFrameUpdate).
 ToDoManager.OWNED_FIELDS_SCAN_BATCH_SIZE = 5
+--- Milliseconds between scan batches while the overview tab is open.
 ToDoManager.OWNED_FIELDS_SCAN_INTERVAL_MS = 40
 ToDoManager.OWNED_FIELDS_MENU_RESCAN_MS = 15000
 ToDoManager.SAVE_DEBOUNCE_MS = 2000
@@ -853,8 +855,8 @@ function ToDoManager:updateAutoCompletion()
         local fieldCache = nil
 
         if field ~= nil and field.getCenterOfFieldWorldPosition ~= nil then
-            local posX, posZ = field:getCenterOfFieldWorldPosition()
-            if posX ~= nil and posZ ~= nil and FieldTaskCompletion ~= nil then
+            local okPos, posX, posZ = pcall(field.getCenterOfFieldWorldPosition, field)
+            if okPos and posX ~= nil and posZ ~= nil and FieldTaskCompletion ~= nil then
                 fieldCache = FieldTaskCompletion.newFieldCompletionCache(field, posX, posZ)
                 local fieldState = FieldAdvisor.getEnrichedFieldState(field, fieldId, posX, posZ)
                 fieldCache.fieldState = fieldState

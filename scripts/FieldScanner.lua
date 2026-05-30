@@ -107,11 +107,14 @@ function FieldScanner:isPlayerOwnedField(field)
     local farmId = self:getPlayerFarmId()
     local posX, posZ = nil, nil
     if field.getCenterOfFieldWorldPosition ~= nil then
-        posX, posZ = field:getCenterOfFieldWorldPosition()
+        local ok, x, z = pcall(field.getCenterOfFieldWorldPosition, field)
+        if ok then
+            posX, posZ = x, z
+        end
     end
 
     if posX ~= nil and posZ ~= nil and field.fieldState ~= nil and field.fieldState.update ~= nil then
-        field.fieldState:update(posX, posZ)
+        pcall(field.fieldState.update, field.fieldState, posX, posZ)
     end
 
     if farmId ~= nil and field.fieldState ~= nil and field.fieldState.ownerFarmId == farmId then
@@ -279,14 +282,17 @@ function FieldScanner:normalizeField(field, forceInclude)
 
     local posX, posZ = nil, nil
     if field.getCenterOfFieldWorldPosition ~= nil then
-        posX, posZ = field:getCenterOfFieldWorldPosition()
+        local ok, x, z = pcall(field.getCenterOfFieldWorldPosition, field)
+        if ok then
+            posX, posZ = x, z
+        end
     end
     if posX == nil or posZ == nil then
         return nil
     end
 
     if field.fieldState ~= nil and field.fieldState.update ~= nil then
-        field.fieldState:update(posX, posZ)
+        pcall(field.fieldState.update, field.fieldState, posX, posZ)
     end
 
     local fieldId = field.getId ~= nil and field:getId() or 0

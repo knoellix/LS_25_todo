@@ -372,7 +372,8 @@ function FieldToDoMenuFrame:onFrameUpdate(dt)
             self.deferredListReloadTimer = 0
             self.deferredListReloadAttempts = self.deferredListReloadAttempts + 1
             self:pushMenuButtons()
-            self:syncOwnedFieldsFromScan()
+            -- Repaint without cache invalidate (sync scan progress only when dirty).
+            self:refreshLists(false)
             local deferredManager = self:getManager()
             local hasFields = deferredManager ~= nil and #self.ownedFields > 0
             if hasFields or self.deferredListReloadAttempts >= 30 then

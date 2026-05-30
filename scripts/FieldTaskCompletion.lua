@@ -281,7 +281,7 @@ function FieldTaskCompletion.getSampleGridRatio(field, task, centerX, centerZ)
     end
 
     if field.fieldState ~= nil and field.fieldState.update ~= nil then
-        field.fieldState:update(centerX, centerZ)
+        pcall(field.fieldState.update, field.fieldState, centerX, centerZ)
     end
 
     if total <= 0 then
@@ -653,7 +653,11 @@ function FieldTaskCompletion.isTaskComplete(task, scanner, fieldCache)
             return false
         end
 
-        posX, posZ = field:getCenterOfFieldWorldPosition()
+        local okPos, px, pz = pcall(field.getCenterOfFieldWorldPosition, field)
+        if not okPos or px == nil or pz == nil then
+            return false
+        end
+        posX, posZ = px, pz
     end
 
     local threshold = FieldTaskCompletion.getThreshold()
