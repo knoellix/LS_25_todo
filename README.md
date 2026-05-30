@@ -114,9 +114,7 @@ Use issue templates for bug reports, feature requests, and translations:
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
-**0.1.0.5** — incremental field scan, scan status dot, targeted row refresh, 15 s passive rescan.
-
-**Unreleased (audit follow-up)** — multi-probe field advisor, Proton-safe grass/swath detection, growth column in overview, menu perf (UI tick only when tab visible), task-list move without full reload.
+**0.1.0.5** — incremental field scan and scan status; multi-probe field advisor (crop, growth, harvest, grass logistics); Proton-safe swath detection; menu and task-list performance; targeted row refresh and 15 s passive rescan.
 
 ## Current Work In Progress
 

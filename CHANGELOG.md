@@ -2,37 +2,6 @@
 
 All notable changes to **FS25_FieldToDoList** are documented here.
 
-## [Unreleased]
-
-Post-**0.1.0.5** field-advisor audit: classification accuracy, Proton/Linux stability, and menu performance.
-
-### Improved
-
-- **Multi-probe field advisor:** dominant situation + representative state from a 3×3 grid; fruit, growth, and harvest labels share one path (`buildFieldLabels`).
-- **Growth column:** overview „Wachstum“ / growth state comes from the same harvest projection as suggestions (not a separate center-only read).
-- **Grass / meadow logistics:** post-mow residue chain (loose → swath → collect / bale → bale collect) uses live height-map and windrow signals; permissive inside-field checks on Proton where the engine returns no polygon test.
-- **Luzerne / clover / alfalfa:** after mow, swath/collect hints instead of a misleading next-harvest month while logistics are pending.
-- **Harvest projection:** effective growth state for withered crops; calendar month clamped 1–12; non-seasonal period estimate without max-harvest-state fallback.
-- **Engine API hardening:** shared `getFieldCenterWorldPosition` (pcall) across advisor, scanner, visit, PF/SCS readers, debug dump, and completion baselines; `g_fieldManager.getFields` guarded.
-- **Task list UX:** `Hoch` / `Runter` refreshes order without full SmoothList reload; open ↔ done toggle triggers partition reload.
-- **Menu performance:** `onFrameUpdate` runs only while the Field-To-Do ESC tab is visible (scan still ticks in the background).
-- **Debug dump:** harvest projection lines use `harvestState` (aligned with in-game advisor).
-
-### Fixed
-
-- **Proton swath regression:** clover/lucerne after mow showed harvest window instead of swath/collect when strict inside-field tests returned false.
-- **Plowed empty fields** (e.g. field 14): no longer labeled „Gras“; lone bare center no longer overrides a grass/arable majority.
-- **Weed done rule:** `weedState <= 0` no longer counts as dead/sprayed coverage.
-- **Auto-complete ground ratio:** correct `FieldGroundType.getValueByType` usage; numeric area coercion.
-- **Aggregation cache:** invalidates when center probe situation changes; `SOWN` / `PLANTED` / `RIDGE_SOWN` treated as non-grass ground; early grid exit requires ≥2 edge probes.
-- **Field scanner:** normalized rows use advisor labels only (no stale `getFruitName` / `getGrowthLabel` fallback); placeholder records keep field name.
-- **Grass fruit labels:** resolve from probe aggregation + refine path instead of generic „Gras“ early return.
-
-### Known limitations
-
-- Auto-completion still work in progress; needs more testing on real savegames and mod fruits.
-- Low-priority polish (arrow-button DDS icons, optional skip task reload during field-only scan) not done yet.
-
 ## [0.1.0.5] — 2026-05-30
 
 ### Added
@@ -47,17 +16,32 @@ Post-**0.1.0.5** field-advisor audit: classification accuracy, Proton/Linux stab
 - Field overview **performance:** lighter 3×3 probe grid for display (5×5 kept for auto-complete); probe aggregation, fruit-name, and completion fingerprint caches.
 - **Auto-complete → overview sync:** when a field task is marked done, only that field row is re-read (`refreshFieldRecordSync`) — no wait for a full rescan.
 - Passive full rescan while menu open: **5 s → 15 s** (enough for fields without open tasks).
-- Menu updates: `InGameMenu.update` + mission-update fallback drive `onFrameUpdate` on custom tab pages.
+- **Multi-probe field advisor:** dominant situation + representative state from a 3×3 grid; fruit, growth, and harvest labels share one path (`buildFieldLabels`).
+- **Growth column:** overview growth state comes from the same harvest projection as suggestions (not a separate center-only read).
+- **Grass / meadow logistics:** post-mow residue chain (loose → swath → collect / bale → bale collect) uses live height-map and windrow signals; permissive inside-field checks on Proton where the engine returns no polygon test.
+- **Luzerne / clover / alfalfa:** after mow, swath/collect hints instead of a misleading next-harvest month while logistics are pending.
+- **Harvest projection:** effective growth state for withered crops; calendar month clamped 1–12; non-seasonal period estimate without max-harvest-state fallback.
+- **Engine API hardening:** shared `getFieldCenterWorldPosition` (pcall) across advisor, scanner, visit, PF/SCS readers, debug dump, and completion baselines; `g_fieldManager.getFields` guarded.
+- **Task list UX:** `Hoch` / `Runter` refreshes order without full SmoothList reload; open ↔ done toggle triggers partition reload.
+- **Menu performance:** `onFrameUpdate` runs only while the Field-To-Do ESC tab is visible (scan still ticks in the background).
+- **Debug dump:** harvest projection lines use `harvestState` (aligned with in-game advisor).
 
 ### Fixed
 
 - Field list stuck on `…` placeholders (deferred reload no longer invalidates scan cache every 500 ms; `reloadData()` instead of `reloadVisibleItems()` on scan progress).
 - Overview scan not advancing when ESC tab was open (scan tick + UI sync wiring).
 - Scan reset loop when growth/ownership events fired during incremental scan; UI sync no longer depends on fragile page-visibility checks (`ownedFieldsScanActive` + direct list sync after tick).
+- **Proton swath regression:** clover/lucerne after mow showed harvest window instead of swath/collect when strict inside-field tests returned false.
+- **Plowed empty fields** (e.g. field 14): no longer labeled „Gras“; lone bare center no longer overrides a grass/arable majority.
+- **Weed done rule:** `weedState <= 0` no longer counts as dead/sprayed coverage.
+- **Auto-complete ground ratio:** correct `FieldGroundType.getValueByType` usage; numeric area coercion.
+- **Aggregation cache:** invalidates when center probe situation changes; `SOWN` / `PLANTED` / `RIDGE_SOWN` treated as non-grass ground; early grid exit requires ≥2 edge probes.
+- **Field scanner:** normalized rows use advisor labels only (no stale `getFruitName` / `getGrowthLabel` fallback); placeholder records keep field name.
+- **Grass fruit labels:** resolve from probe aggregation + refine path instead of generic „Gras“ early return.
 
 ### Known limitations
 
-- Grass swath → collect/bale chain still being tuned on some maps/Proton; use `ftdlDump` for diagnosis.
+- Auto-completion still work in progress; needs more testing on real savegames and mod fruits.
 - Field worked **without** an open task may take up to ~15 s to refresh in the overview while the menu stays open.
 
 ## [0.1.0.4] — 2026-05-29
@@ -116,7 +100,6 @@ Post-**0.1.0.5** field-advisor audit: classification accuracy, Proton/Linux stab
 
 - Initial public pre-release: ESC to-do list, field overview, HUD, work-order presets, PF/SCS columns (limited), grass-aware suggestions.
 
-[Unreleased]: https://github.com/knoellix/FS25_FieldToDoList/compare/v0.1.0.5...HEAD
 [0.1.0.5]: https://github.com/knoellix/FS25_FieldToDoList/compare/v0.1.0.4...v0.1.0.5
 [0.1.0.4]: https://github.com/knoellix/FS25_FieldToDoList/compare/v0.1.0.3...v0.1.0.4
 [0.1.0.3]: https://github.com/knoellix/FS25_FieldToDoList/compare/v0.1.0.2...v0.1.0.3
