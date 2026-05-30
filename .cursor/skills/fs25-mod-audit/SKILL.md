@@ -145,7 +145,7 @@ Dateien: `gui/FieldToDoMenuFrame.lua` + `.xml`, `ToDoManager.lua`,
 - Field 9 gespritzter Weizen: Unkraut **tot**, keine Combat-Empfehlung bei ≤5 % live.
 - Gras-Logistik: `loose → swath → collect/bale → bale_collect` konsistent.
 - `ftdlDump` vs UI: Ernte-Monat muss übereinstimmen (Center-Probe).
-- **Feldliste Menü:** Zeilen mit `...` füllen sich schrittweise (ca. 2 Felder / 50 ms); kein Dauer-Reset beim Öffnen.
+- **Feldliste Menü:** Zeilen mit `...` füllen sich schrittweise (ca. 5 Felder / 40 ms, bis 2 Batches/Tick); kein Dauer-Reset beim Öffnen.
 
 ## Subagent-Prompt-Vorlage
 Pro Dimension einen `Task` starten (parallel, readonly):

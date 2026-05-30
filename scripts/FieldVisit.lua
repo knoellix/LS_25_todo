@@ -15,11 +15,9 @@ function FieldVisit.getFieldWorldPosition(field)
         return nil, nil
     end
 
-    if field.getCenterOfFieldWorldPosition ~= nil then
-        local x, z = field:getCenterOfFieldWorldPosition()
-        if x ~= nil and z ~= nil then
-            return x, z
-        end
+    local x, z = FieldAdvisor.getFieldCenterWorldPosition(field)
+    if x ~= nil and z ~= nil then
+        return x, z
     end
 
     if field.worldX ~= nil and field.worldZ ~= nil then

@@ -51,10 +51,7 @@ local function findEngineField(fieldId)
     for _, field in pairs(fields) do
         local id = field.getId ~= nil and field:getId() or nil
         if id == fieldId then
-            local x, z = nil, nil
-            if field.getCenterOfFieldWorldPosition ~= nil then
-                x, z = field:getCenterOfFieldWorldPosition()
-            end
+            local x, z = FieldAdvisor.getFieldCenterWorldPosition(field)
             return field, x, z
         end
     end
@@ -233,17 +230,17 @@ function FieldDebugDump.dumpField(fieldId)
                 s(desc.minHarvestingGrowthState), s(desc.maxHarvestingGrowthState),
                 s(desc.getIsHarvestReady ~= nil), s(desc.getIsHarvestableInPeriod ~= nil)))
         end
-        out(string.format("estimatePeriodsUntilHarvest -> %s", s(FieldAdvisor.estimateNonSeasonalPeriodsUntilHarvest(fruitForHarvest, fieldState, desc))))
+        out(string.format("estimatePeriodsUntilHarvest -> %s", s(FieldAdvisor.estimateNonSeasonalPeriodsUntilHarvest(fruitForHarvest, harvestState, desc))))
         out(string.format("getExpectedHarvestPeriod -> %s (%s)",
-            s(FieldAdvisor.getExpectedHarvestPeriod(fruitForHarvest, fieldState)),
+            s(FieldAdvisor.getExpectedHarvestPeriod(fruitForHarvest, harvestState)),
             s(FieldAdvisor.getHarvestPeriodDisplayLabel(
-                FieldAdvisor.getExpectedHarvestPeriod(fruitForHarvest, fieldState)))))
-        out(string.format("getHarvestWindowHint -> '%s'", s(FieldAdvisor.getHarvestWindowHint(fruitForHarvest, fieldState))))
-        local growthState = FieldAdvisor.getEffectiveGrowthState(fieldState)
+                FieldAdvisor.getExpectedHarvestPeriod(fruitForHarvest, harvestState)))))
+        out(string.format("getHarvestWindowHint -> '%s'", s(FieldAdvisor.getHarvestWindowHint(fruitForHarvest, harvestState))))
+        local growthState = FieldAdvisor.getEffectiveGrowthState(harvestState)
         out(string.format("harvestProjection: growth=%s stepsUntilRipe=%s",
             s(growthState),
-            s(FieldAdvisor.estimateNonSeasonalPeriodsUntilHarvest(fruitForHarvest, fieldState, desc))))
-        out(string.format("isCropHarvestReady -> %s", s(FieldAdvisor.isCropHarvestReady(field, fieldState, fruitForHarvest))))
+            s(FieldAdvisor.estimateNonSeasonalPeriodsUntilHarvest(fruitForHarvest, harvestState, desc))))
+        out(string.format("isCropHarvestReady -> %s", s(FieldAdvisor.isCropHarvestReady(field, harvestState, fruitForHarvest))))
     end
 
     out(string.format("===== END FIELD %d =====", fieldId))

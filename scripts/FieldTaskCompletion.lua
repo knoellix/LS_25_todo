@@ -128,15 +128,19 @@ function FieldTaskCompletion.getDensityMapGroundRatio(field, groundTypeName)
     end
 
     local targetValue = nil
-    if FieldGroundType.getValueByType ~= nil then
-        local ok, value = pcall(FieldGroundType.getValueByType, FieldGroundType, groundTypeName)
-        if ok then
-            targetValue = value
+    local enumValue = FieldGroundType[groundTypeName]
+    if enumValue == nil and FieldGroundType.getByName ~= nil then
+        local okName, named = pcall(FieldGroundType.getByName, groundTypeName)
+        if okName then
+            enumValue = named
         end
     end
 
-    if targetValue == nil and FieldGroundType[groundTypeName] ~= nil then
-        targetValue = FieldGroundType[groundTypeName]
+    if enumValue ~= nil and FieldGroundType.getValueByType ~= nil then
+        local ok, value = pcall(FieldGroundType.getValueByType, enumValue)
+        if ok then
+            targetValue = value
+        end
     end
 
     if targetValue == nil then
@@ -160,12 +164,17 @@ function FieldTaskCompletion.getDensityMapGroundRatio(field, groundTypeName)
         return modifier:executeGet(filter)
     end)
 
-    if not ok or totalArea == nil or totalArea <= 0 then
+    if not ok or totalArea == nil then
         return nil
     end
 
-    local doneArea = completedArea or 0
-    return math.min(1, doneArea / totalArea)
+    local doneArea = tonumber(completedArea) or 0
+    local areaTotal = tonumber(totalArea)
+    if areaTotal == nil or areaTotal <= 0 then
+        return nil
+    end
+
+    return math.min(1, doneArea / areaTotal)
 end
 
 ---@param field table

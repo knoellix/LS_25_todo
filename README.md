@@ -16,6 +16,8 @@
 - **Done behavior:** completed tasks are grouped below open tasks; newly completed go to the top of the done group; max 10 completed (oldest pruned)
 - **Selection UX:** after move, the moved task stays selected; after delete, selection is cleared
 - **Harvest hints:** field suggestion column shows month labels instead of ambiguous month counts
+- **Field overview:** multi-probe classification (crop, growth, harvest month, grass logistics) — not a single center sample
+- **Grass logistics:** post-mow chain (swath → collect / bale → bale collect) from live residue signals
 - **Save data:** `fieldToDoList.xml` in the savegame folder (tasks debounced ~2 s after edits; settings saved immediately)
 - **Field status:** live ground/crop readout from the game (the mod does not read `fields.xml` at runtime — safer on Proton/Linux)
 - **Grass meadows:** mow when ready; post-mow hints for swath/collect/bale; avoids suggesting sow on grass
@@ -85,7 +87,7 @@ Works on **Windows, macOS, and Linux** (including Steam/Proton). Use when a fiel
 | macOS | `~/Library/Application Support/FarmingSimulator2025/log.txt` |
 | Linux (Steam / Proton) | `~/.local/share/Steam/steamapps/compatdata/2300320/pfx/drive_c/users/steamuser/Documents/My Games/FarmingSimulator2025/log.txt` |
 
-Search for `[FS25_FieldToDoList] DUMP`. Useful lines: `meadowPhase`, `grassResidue`, `grassCrossScan`, `heightReader`, `harvestState`.
+Search for `[FS25_FieldToDoList] DUMP`. Useful lines: `meadowPhase`, `grassResidue`, `grassCrossScan`, `heightReader`, `harvestState`, `aggregation`.
 
 Example:
 
@@ -110,12 +112,16 @@ Use issue templates for bug reports, feature requests, and translations:
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes. Highlights in **0.1.0.5**: incremental field scan, scan status dot, targeted row refresh on auto-complete, 15 s passive rescan, performance caches.
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+**0.1.0.5** — incremental field scan, scan status dot, targeted row refresh, 15 s passive rescan.
+
+**Unreleased (audit follow-up)** — multi-probe field advisor, Proton-safe grass/swath detection, growth column in overview, menu perf (UI tick only when tab visible), task-list move without full reload.
 
 ## Current Work In Progress
 
-- Grass swath → collect/bale suggestions still being tuned on some maps (especially Proton without `DensityMapHeightUtil`).
-- Auto-completion is still work in progress and needs broader real-save testing.
+- Auto-completion still needs broader real-save testing (especially organic multi-pass and mod fruits).
+- Optional mod columns (Seasonal Crop Stress) remain partial.
 
 ## License
 

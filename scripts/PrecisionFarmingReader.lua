@@ -150,8 +150,8 @@ end
 ---@param field table|nil
 ---@return table|nil
 function PrecisionFarmingReader.getSamplePoints(field, worldX, worldZ)
-    if field ~= nil and field.getCenterOfFieldWorldPosition ~= nil then
-        local centerX, centerZ = field:getCenterOfFieldWorldPosition()
+    if field ~= nil then
+        local centerX, centerZ = FieldAdvisor.getFieldCenterWorldPosition(field)
         if centerX ~= nil and centerZ ~= nil then
             return {
                 { x = centerX, z = centerZ },

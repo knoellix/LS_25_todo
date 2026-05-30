@@ -44,9 +44,9 @@ end
 ---@param field table
 ---@return string
 function FieldScanner:getGrowthLabel(field)
-    local posX, posZ = nil, nil
-    if field.getCenterOfFieldWorldPosition ~= nil then
-        posX, posZ = field:getCenterOfFieldWorldPosition()
+    local posX, posZ = FieldAdvisor.getFieldCenterWorldPosition(field)
+    if posX == nil or posZ == nil then
+        return "-"
     end
 
     local fieldId = field.getId ~= nil and field:getId() or 0
@@ -105,12 +105,9 @@ function FieldScanner:isPlayerOwnedField(field)
     end
 
     local farmId = self:getPlayerFarmId()
-    local posX, posZ = nil, nil
-    if field.getCenterOfFieldWorldPosition ~= nil then
-        local ok, x, z = pcall(field.getCenterOfFieldWorldPosition, field)
-        if ok then
-            posX, posZ = x, z
-        end
+    local posX, posZ = FieldAdvisor.getFieldCenterWorldPosition(field)
+    if posX == nil or posZ == nil then
+        return false
     end
 
     if posX ~= nil and posZ ~= nil and field.fieldState ~= nil and field.fieldState.update ~= nil then
@@ -180,7 +177,10 @@ function FieldScanner:collectOwnedFieldCandidates()
 
     local allFields = g_fieldManager.fields
     if allFields == nil and g_fieldManager.getFields ~= nil then
-        allFields = g_fieldManager:getFields()
+        local ok, value = pcall(g_fieldManager.getFields, g_fieldManager)
+        if ok then
+            allFields = value
+        end
     end
 
     if allFields ~= nil then
@@ -226,10 +226,7 @@ function FieldScanner:buildPlaceholderFieldRecord(candidate)
 
     local field = candidate.field
     local fieldId = candidate.id
-    local posX, posZ = nil, nil
-    if field.getCenterOfFieldWorldPosition ~= nil then
-        posX, posZ = field:getCenterOfFieldWorldPosition()
-    end
+    local posX, posZ = FieldAdvisor.getFieldCenterWorldPosition(field)
 
     local fieldName = field.name
     if string.isNilOrWhitespace(fieldName) then
@@ -280,13 +277,7 @@ function FieldScanner:normalizeField(field, forceInclude)
         return nil
     end
 
-    local posX, posZ = nil, nil
-    if field.getCenterOfFieldWorldPosition ~= nil then
-        local ok, x, z = pcall(field.getCenterOfFieldWorldPosition, field)
-        if ok then
-            posX, posZ = x, z
-        end
-    end
+    local posX, posZ = FieldAdvisor.getFieldCenterWorldPosition(field)
     if posX == nil or posZ == nil then
         return nil
     end
@@ -316,8 +307,8 @@ function FieldScanner:normalizeField(field, forceInclude)
         name = fieldName,
         worldX = posX,
         worldZ = posZ,
-        fruit = labels.fruit or self:getFruitName(field),
-        growthState = self:getGrowthLabel(field),
+        fruit = labels.fruit or "-",
+        growthState = labels.growthState or "-",
         expectedHarvest = labels.expectedHarvest or "-",
         cropPhase = labels.cropPhase,
         areaHa = field.areaHa or 0,

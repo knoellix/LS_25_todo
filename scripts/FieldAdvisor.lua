@@ -94,6 +94,9 @@ FieldAdvisor.NON_GRASS_GROUND_TYPES = {
     "HARVEST_READY",
     "DIRECT_SOWN",
     "ROLLER_LINES",
+    "SOWN",
+    "PLANTED",
+    "RIDGE_SOWN",
 }
 
 ---@param fieldState table|nil
@@ -831,8 +834,12 @@ function FieldAdvisor.resolveDominantSituationFromCounts(counts, centerSituation
         dominantSituation = centerSituation
     end
 
+    -- Lone plowed center on a grass/arable majority must not flip the whole field to bare.
     if centerSituation == FieldAdvisor.PROBE_SITUATION.BARE_SOIL then
-        dominantSituation = FieldAdvisor.PROBE_SITUATION.BARE_SOIL
+        local bareCount = counts[FieldAdvisor.PROBE_SITUATION.BARE_SOIL] or 0
+        if bareCount >= maxCount then
+            dominantSituation = FieldAdvisor.PROBE_SITUATION.BARE_SOIL
+        end
     end
 
     return dominantSituation
@@ -901,13 +908,7 @@ function FieldAdvisor.refreshAggregationFromCenter(aggregation, centerState, fie
         local centerFruit = FieldAdvisor.getFruitTypeIndex(centerState)
         if centerFruit ~= nil and centerFruit > 0 and not FieldAdvisor.isUnknownFruitIndex(centerFruit) then
             if FieldAdvisor.isGenericGrassFruitIndex(centerFruit) and field ~= nil then
-                local wx, wz = nil, nil
-                if field.getCenterOfFieldWorldPosition ~= nil then
-                    local ok, x, z = pcall(field.getCenterOfFieldWorldPosition, field)
-                    if ok then
-                        wx, wz = x, z
-                    end
-                end
+                local wx, wz = FieldAdvisor.getFieldCenterWorldPosition(field)
                 local refined = FieldAdvisor.refineGrassFruitTypeIndex(
                     centerState, field, centerFruit, wx, wz
                 )
@@ -955,7 +956,10 @@ function FieldAdvisor.aggregateFieldProbes(field, fieldId, centerState, worldX, 
             FieldAdvisor.PROBE_AGGREGATION_CACHE_TTL_MS
         )
         if cached ~= nil then
-            return FieldAdvisor.refreshAggregationFromCenter(cached, centerState, field)
+            local liveCenterSituation = FieldAdvisor.classifyProbe(centerState, field)
+            if cached.centerSituation == liveCenterSituation then
+                return FieldAdvisor.refreshAggregationFromCenter(cached, centerState, field)
+            end
         end
     end
 
@@ -977,8 +981,8 @@ function FieldAdvisor.aggregateFieldProbes(field, fieldId, centerState, worldX, 
     local fieldGrassHint = FieldAdvisor.inferGrassFruitTypeIndexFromField(field)
     local maxStubbleShredLevel = FieldAdvisor.getStateNumber(centerState, "stubbleShredLevel")
 
-    if (worldX == nil or worldZ == nil) and field ~= nil and field.getCenterOfFieldWorldPosition ~= nil then
-        worldX, worldZ = field:getCenterOfFieldWorldPosition()
+    if worldX == nil or worldZ == nil then
+        worldX, worldZ = FieldAdvisor.getFieldCenterWorldPosition(field)
     end
 
     local function considerProbe(state, isCenter, probeX, probeZ)
@@ -1041,6 +1045,11 @@ function FieldAdvisor.aggregateFieldProbes(field, fieldId, centerState, worldX, 
             return false
         end
 
+        -- Require edge probes before skipping the rest (misclassified center must not truncate the grid).
+        if total - 1 < 2 then
+            return false
+        end
+
         return counts[centerSituation] == total
     end
 
@@ -1051,7 +1060,7 @@ function FieldAdvisor.aggregateFieldProbes(field, fieldId, centerState, worldX, 
         end
 
         for _, point in ipairs(points) do
-            if FieldAdvisor.isPositionInsideField(field, point.x, point.z) then
+            if FieldAdvisor.isPositionInsideFieldOrUnknown(field, point.x, point.z) then
                 local isCenter = point.x == worldX and point.z == worldZ
                 if not isCenter then
                     local sampleState = FieldAdvisor.getEnrichedFieldState(field, fieldId, point.x, point.z)
@@ -1810,6 +1819,10 @@ function FieldAdvisor.isWeedProbeDead(fieldState)
         end
     end
 
+    if weedState <= 0 then
+        return false
+    end
+
     return FieldAdvisor.isWeedDeadOrSprayed(fieldState)
 end
 
@@ -1857,9 +1870,7 @@ function FieldAdvisor.sampleWeedCoverage(field, fieldId, worldX, worldZ)
     end
 
     if worldX == nil or worldZ == nil then
-        if field.getCenterOfFieldWorldPosition ~= nil then
-            worldX, worldZ = field:getCenterOfFieldWorldPosition()
-        end
+        worldX, worldZ = FieldAdvisor.getFieldCenterWorldPosition(field)
     end
 
     if worldX == nil or worldZ == nil then
@@ -1875,7 +1886,7 @@ function FieldAdvisor.sampleWeedCoverage(field, fieldId, worldX, worldZ)
     points = FieldAdvisor.reduceSamplePoints(points, FieldAdvisor.COVERAGE_MAX_SAMPLE_POINTS)
 
     for _, point in ipairs(points) do
-        if FieldAdvisor.isPositionInsideField(field, point.x, point.z) then
+        if FieldAdvisor.isPositionInsideFieldOrUnknown(field, point.x, point.z) then
             local sampleState = FieldAdvisor.getEnrichedFieldState(field, fieldId, point.x, point.z)
             summary.total = summary.total + 1
 
@@ -2030,7 +2041,7 @@ function FieldAdvisor.measureFieldAxisHalfExtent(field, centerX, centerZ, dirX, 
     local maxDist = 0
     local step = 3
     for dist = step, 320, step do
-        if FieldAdvisor.isPositionInsideField(field, centerX + dirX * dist, centerZ + dirZ * dist) then
+        if FieldAdvisor.isPositionInsideFieldOrUnknown(field, centerX + dirX * dist, centerZ + dirZ * dist) then
             maxDist = dist
         else
             break
@@ -2038,7 +2049,7 @@ function FieldAdvisor.measureFieldAxisHalfExtent(field, centerX, centerZ, dirX, 
     end
 
     for dist = step, 320, step do
-        if FieldAdvisor.isPositionInsideField(field, centerX - dirX * dist, centerZ - dirZ * dist) then
+        if FieldAdvisor.isPositionInsideFieldOrUnknown(field, centerX - dirX * dist, centerZ - dirZ * dist) then
             maxDist = math.max(maxDist, dist)
         else
             break
@@ -2075,7 +2086,7 @@ function FieldAdvisor.collectGrassResidueSamplePoints(field, centerX, centerZ, c
         if seen[key] then
             return
         end
-        if not FieldAdvisor.isPositionInsideField(field, x, z) then
+        if not FieldAdvisor.isPositionInsideFieldOrUnknown(field, x, z) then
             return
         end
         seen[key] = true
@@ -2239,7 +2250,7 @@ function FieldAdvisor.countGrassWindrowMaterialHits(field, worldX, worldZ, cross
     local materialThreshold = FieldAdvisor.GRASS_RESIDUE_ENGINE_MATERIAL_MIN
 
     for _, point in ipairs(points) do
-        if FieldAdvisor.isPositionInsideField(field, point.x, point.z) then
+        if FieldAdvisor.isPositionInsideFieldOrUnknown(field, point.x, point.z) then
             local material = FieldAdvisor.measureHeightMaterialAtPoint(point.x, point.z)
             maxMaterial = math.max(maxMaterial, material)
 
@@ -2412,9 +2423,7 @@ function FieldAdvisor.shouldTreatGrassResidueAsSwath(summary, aggregation, probe
     end
 
     if field == nil or worldX == nil or worldZ == nil then
-        if field ~= nil and field.getCenterOfFieldWorldPosition ~= nil then
-            worldX, worldZ = field:getCenterOfFieldWorldPosition()
-        end
+        worldX, worldZ = FieldAdvisor.getFieldCenterWorldPosition(field)
     end
     if field ~= nil and worldX ~= nil and worldZ ~= nil then
         local hits, crossLiters, crossMaterial = FieldAdvisor.countGrassWindrowMaterialHits(
@@ -2531,7 +2540,7 @@ function FieldAdvisor.getWindrowFillTypeIndexForFruit(fruitTypeIndex)
             return g_fruitTypeManager:getWindrowFillTypeIndexByFruitTypeIndex(fruitTypeIndex)
         end)
         if ok and index ~= nil and index > 0 then
-            return index
+            return tonumber(index)
         end
 
         ok, index = pcall(
@@ -2540,7 +2549,7 @@ function FieldAdvisor.getWindrowFillTypeIndexForFruit(fruitTypeIndex)
             fruitTypeIndex
         )
         if ok and index ~= nil and index > 0 then
-            return index
+            return tonumber(index)
         end
     end
 
@@ -2728,8 +2737,9 @@ function FieldAdvisor.measureHeightFillTypeAtPoint(x, z)
 
     local y = FieldAdvisor.getTerrainSampleY(x, z)
     local ok, fillTypeIndex = pcall(getDensityTypeIndexAtWorldPos, planeId, x, y, z)
-    if ok and fillTypeIndex ~= nil and fillTypeIndex > 0 then
-        return fillTypeIndex, material
+    local idx = ok and tonumber(fillTypeIndex) or nil
+    if idx ~= nil and idx > 0 then
+        return idx, material
     end
 
     return nil, material
@@ -2752,6 +2762,7 @@ end
 ---@param windrowSet table
 ---@return boolean
 function FieldAdvisor.isKnownWindrowFillType(fillTypeIndex, windrowSet)
+    fillTypeIndex = tonumber(fillTypeIndex)
     if fillTypeIndex == nil or fillTypeIndex <= 0 or windrowSet == nil then
         return false
     end
@@ -2925,9 +2936,7 @@ function FieldAdvisor.refineGrassResidueSummary(summary, aggregation, probeState
             return summary
         end
         if field == nil or worldX == nil or worldZ == nil then
-            if field ~= nil and field.getCenterOfFieldWorldPosition ~= nil then
-                worldX, worldZ = field:getCenterOfFieldWorldPosition()
-            end
+            worldX, worldZ = FieldAdvisor.getFieldCenterWorldPosition(field)
         end
         if postMow and field ~= nil and worldX ~= nil and worldZ ~= nil then
             local hits, crossLiters, crossMaterial = FieldAdvisor.countGrassWindrowMaterialHits(
@@ -2954,9 +2963,7 @@ function FieldAdvisor.refineGrassResidueSummary(summary, aggregation, probeState
     end
 
     if field == nil or worldX == nil or worldZ == nil then
-        if field ~= nil and field.getCenterOfFieldWorldPosition ~= nil then
-            worldX, worldZ = field:getCenterOfFieldWorldPosition()
-        end
+        worldX, worldZ = FieldAdvisor.getFieldCenterWorldPosition(field)
     end
     if field == nil or worldX == nil or worldZ == nil then
         return summary
@@ -3030,16 +3037,16 @@ function FieldAdvisor.detectGrassResidue(field, worldX, worldZ, maxPoints, prior
         local centerState = aggregation.centerState
         local centerMeadowPhase = FieldAdvisor.getGrassMeadowPhase(centerState, field, aggregation)
         local centerGrassHint = FieldAdvisor.getFruitTypeIndex(centerState)
-        if FieldAdvisor.isGrassStandingCropPhase(centerMeadowPhase, centerState, field, centerGrassHint)
+        if centerMeadowPhase == "harvestable"
+            and FieldAdvisor.isGrassStandingCropPhase(
+                centerMeadowPhase, centerState, field, centerGrassHint)
             and not FieldAdvisor.fieldHasPostMowGrassSignal(aggregation, centerState, field, centerGrassHint) then
             return empty
         end
     end
 
     if worldX == nil or worldZ == nil then
-        if field.getCenterOfFieldWorldPosition ~= nil then
-            worldX, worldZ = field:getCenterOfFieldWorldPosition()
-        end
+        worldX, worldZ = FieldAdvisor.getFieldCenterWorldPosition(field)
     end
     if worldX == nil or worldZ == nil then
         return empty
@@ -3119,7 +3126,7 @@ function FieldAdvisor.detectGrassResidue(field, worldX, worldZ, maxPoints, prior
     }
 
     for index, point in ipairs(points) do
-        if FieldAdvisor.isPositionInsideField(field, point.x, point.z) then
+        if FieldAdvisor.isPositionInsideFieldOrUnknown(field, point.x, point.z) then
             scan.total = scan.total + 1
             local sampleHalfSize = (index == 1) and centerHalfSize or halfSize
             local sampleLiters = FieldAdvisor.measureWindrowLitersAtPoint(point, fillTypes, sampleHalfSize)
@@ -3204,7 +3211,8 @@ function FieldAdvisor.measureWindrowLitersAtPoint(point, fillTypes, sampleHalfSi
     local litersPerMeter = 2500
     if g_densityMapHeightManager ~= nil and g_densityMapHeightManager.getLitersFromHeight ~= nil then
         local ok, liters = pcall(g_densityMapHeightManager.getLitersFromHeight, g_densityMapHeightManager, maxMaterial)
-        if ok and liters ~= nil and liters > 0 then
+        liters = ok and tonumber(liters) or nil
+        if liters ~= nil and liters > 0 then
             return liters
         end
     end
@@ -3475,12 +3483,29 @@ end
 ---@param period number|nil
 ---@return number
 function FieldAdvisor.getCalendarMonthForSeasonPeriod(period)
-    period = math.floor(tonumber(period) or 1)
+    period = math.max(1, math.min(12, math.floor(tonumber(period) or 1)))
     local mapping = {
         [1] = 3, [2] = 4, [3] = 5, [4] = 6, [5] = 7, [6] = 8,
         [7] = 9, [8] = 10, [9] = 11, [10] = 12, [11] = 1, [12] = 2,
     }
-    return mapping[period] or period
+    return mapping[period] or math.max(1, math.min(12, period))
+end
+
+--- Safe field center lookup (Proton/engine API guarded).
+---@param field table|nil
+---@return number|nil
+---@return number|nil
+function FieldAdvisor.getFieldCenterWorldPosition(field)
+    if field == nil or field.getCenterOfFieldWorldPosition == nil then
+        return nil, nil
+    end
+
+    local ok, x, z = pcall(field.getCenterOfFieldWorldPosition, field)
+    if ok and x ~= nil and z ~= nil then
+        return x, z
+    end
+
+    return nil, nil
 end
 
 ---@return number period 1..12
@@ -3726,12 +3751,6 @@ function FieldAdvisor.estimateNonSeasonalPeriodsUntilHarvest(fruitTypeIndex, fie
             local minHarvest = tonumber(fruitDesc.minHarvestingGrowthState) or 0
             if minHarvest > 0 then
                 target = minHarvest
-            end
-        end
-        if target == nil then
-            local maxHarvest = tonumber(fruitDesc.maxHarvestingGrowthState) or 0
-            if maxHarvest > 0 then
-                target = maxHarvest
             end
         end
     end
@@ -4177,9 +4196,7 @@ function FieldAdvisor.inferGrassFruitTypeFromWindrowFill(field, worldX, worldZ)
     end
 
     if worldX == nil or worldZ == nil then
-        if field.getCenterOfFieldWorldPosition ~= nil then
-            worldX, worldZ = field:getCenterOfFieldWorldPosition()
-        end
+        worldX, worldZ = FieldAdvisor.getFieldCenterWorldPosition(field)
     end
     if worldX == nil or worldZ == nil then
         return nil
@@ -4508,10 +4525,7 @@ function FieldAdvisor.getGrassMeadowPhase(fieldState, field, aggregation)
         probeState = aggregation.centerState
     end
 
-    local worldX, worldZ = nil, nil
-    if field ~= nil and field.getCenterOfFieldWorldPosition ~= nil then
-        worldX, worldZ = field:getCenterOfFieldWorldPosition()
-    end
+    local worldX, worldZ = FieldAdvisor.getFieldCenterWorldPosition(field)
 
     local fruitTypeIndex = FieldAdvisor.resolveGrassFruitTypeIndex(probeState, field, aggregation, worldX, worldZ)
     if fruitTypeIndex == nil then
@@ -4785,7 +4799,7 @@ function FieldAdvisor.isWithered(fieldState)
         return false
     end
 
-    local growthState = FieldAdvisor.getGrowthState(fieldState)
+    local growthState = FieldAdvisor.getEffectiveGrowthState(fieldState)
     if growthState <= 0 then
         return false
     end
@@ -4860,9 +4874,7 @@ function FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState, worldX
     end
 
     if worldX == nil or worldZ == nil then
-        if field.getCenterOfFieldWorldPosition ~= nil then
-            worldX, worldZ = field:getCenterOfFieldWorldPosition()
-        end
+        worldX, worldZ = FieldAdvisor.getFieldCenterWorldPosition(field)
     end
 
     if worldX == nil or worldZ == nil then
@@ -4884,7 +4896,7 @@ function FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState, worldX
     end
 
     for _, point in ipairs(points) do
-        if FieldAdvisor.isPositionInsideField(field, point.x, point.z) then
+        if FieldAdvisor.isPositionInsideFieldOrUnknown(field, point.x, point.z) then
             local sampleState = FieldAdvisor.getEnrichedFieldState(field, fieldId, point.x, point.z)
             local groundType = FieldAdvisor.getGroundTypeName(sampleState)
             if FieldAdvisor.groundTypeIsOneOf(groundType, FieldAdvisor.SOIL_WORK_GROUND_TYPES) then
@@ -4934,11 +4946,10 @@ function FieldAdvisor.getFieldFruitDisplayLabel(field, fieldId, fieldState, worl
             end
         end
 
-        if FieldAdvisor.isGenericGrassFruitIndex(centerFruit) then
-            if FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState, worldX, worldZ) then
-                return FieldAdvisor.text("ftdl_fruit_partial_grass", "Gras (teilw. bearb.)")
-            end
-            return FieldAdvisor.text("ftdl_fruit_grass", "Gras")
+        if FieldAdvisor.isGenericGrassFruitIndex(centerFruit)
+            and aggregation.dominantGrassFruit ~= nil
+            and not FieldAdvisor.isGenericGrassFruitIndex(aggregation.dominantGrassFruit) then
+            centerFruit = aggregation.dominantGrassFruit
         end
 
         local fruitTypeIndex = centerFruit
@@ -4969,6 +4980,7 @@ function FieldAdvisor.getFieldFruitDisplayLabel(field, fieldId, fieldState, worl
         if not hasPartialWork then
             return FieldAdvisor.text("ftdl_fruit_grass", "Gras")
         end
+        return FieldAdvisor.text("ftdl_fruit_partial_grass", "Gras (teilw. bearb.)")
     end
 
     if FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState, worldX, worldZ) then
@@ -5292,6 +5304,15 @@ function FieldAdvisor.buildFieldContext(field, fieldState, worldX, worldZ, aggre
         grassResidueSummary = FieldAdvisor.refineGrassResidueSummary(
             grassResidueSummary, aggregation, probeState, field, worldX, worldZ, grassFruitHint
         )
+        if grassResidueSummary ~= nil then
+            local meadowPhase = FieldAdvisor.getGrassMeadowPhase(probeState, field, aggregation)
+            if FieldAdvisor.shouldTreatGrassResidueAsSwath(
+                grassResidueSummary, aggregation, probeState, field, worldX, worldZ,
+                grassFruitHint, meadowPhase) then
+                grassResidueSummary.residueState = FieldAdvisor.GRASS_RESIDUE_SWATH
+                grassResidueSummary.residueAvailable = true
+            end
+        end
         if fieldId ~= nil then
             FieldAdvisor.setCoverageCache(fieldId, "grassResidue", grassResidueSummary)
         end
@@ -5574,10 +5595,7 @@ function FieldAdvisor.addGrassWorkActions(actions, fieldState, field, aggregatio
         probeState = aggregation.centerState
     end
 
-    local worldX, worldZ = nil, nil
-    if field ~= nil and field.getCenterOfFieldWorldPosition ~= nil then
-        worldX, worldZ = field:getCenterOfFieldWorldPosition()
-    end
+    local worldX, worldZ = FieldAdvisor.getFieldCenterWorldPosition(field)
     local grassFruitHint = FieldAdvisor.resolveGrassFruitTypeIndex(probeState, field, aggregation, worldX, worldZ)
 
     local meadowPhase = FieldAdvisor.getGrassMeadowPhase(probeState, field, aggregation)
@@ -6224,11 +6242,15 @@ function FieldAdvisor.formatSuggestionColumn(actions, expectedHarvest)
     return primary
 end
 
----@param field table
+---@param field table|nil
 ---@param x number
 ---@param z number
----@return boolean
-function FieldAdvisor.isPositionInsideField(field, x, z)
+---@return boolean|nil true inside, false outside, nil when engine exposes no inside test
+function FieldAdvisor.testPositionInsideField(field, x, z)
+    if field == nil or x == nil or z == nil then
+        return nil
+    end
+
     local probes = {
         "isWorldPositionInField",
         "isWorldPositionInsideField",
@@ -6237,7 +6259,7 @@ function FieldAdvisor.isPositionInsideField(field, x, z)
     }
 
     for _, probe in ipairs(probes) do
-        local fn = field ~= nil and field[probe] or nil
+        local fn = field[probe]
         if type(fn) == "function" then
             local ok, result = pcall(fn, field, x, z)
             if ok and type(result) == "boolean" then
@@ -6251,7 +6273,29 @@ function FieldAdvisor.isPositionInsideField(field, x, z)
         end
     end
 
-    return true
+    return nil
+end
+
+--- Strict inside test for bales — unknown positions are treated as outside.
+---@param field table|nil
+---@param x number
+---@param z number
+---@return boolean
+function FieldAdvisor.isPositionInsideField(field, x, z)
+    return FieldAdvisor.testPositionInsideField(field, x, z) == true
+end
+
+--- Permissive inside test for field-local scans — unknown keeps legacy behaviour (Proton).
+---@param field table|nil
+---@param x number
+---@param z number
+---@return boolean
+function FieldAdvisor.isPositionInsideFieldOrUnknown(field, x, z)
+    local inside = FieldAdvisor.testPositionInsideField(field, x, z)
+    if inside == nil then
+        return true
+    end
+    return inside
 end
 
 ---@param field table|nil
@@ -6431,6 +6475,7 @@ function FieldAdvisor.buildFieldLabels(field, fieldState, worldX, worldZ)
     local fruitTypeIndex = FieldAdvisor.resolveDisplayArableFruitIndex(field, aggregation, fieldState)
     local partialSoilWork = FieldAdvisor.fieldHasPartialSoilWork(field, fieldId, fieldState, worldX, worldZ)
     local expectedHarvest = FieldAdvisor.getExpectedHarvestLabel(field, fieldState, aggregation, grassResidueSummary)
+    local harvestState = FieldAdvisor.resolveHarvestFieldState(fieldState, aggregation)
 
     return {
         weed = FieldAdvisor.isWeedTaskDoneByCoverage(weedSummary)
@@ -6447,6 +6492,7 @@ function FieldAdvisor.buildFieldLabels(field, fieldState, worldX, worldZ)
         fruit = FieldAdvisor.getFieldFruitDisplayLabel(
             field, fieldId, fieldState, worldX, worldZ, aggregation
         ),
+        growthState = FieldAdvisor.formatGrowthLabel(harvestState),
         cropPhase = FieldAdvisor.getCropPhase(field, fieldState, aggregation),
         expectedHarvest = expectedHarvest,
         suggestion = FieldAdvisor.formatSuggestionColumn(actions, expectedHarvest),

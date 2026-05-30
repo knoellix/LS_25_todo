@@ -269,24 +269,7 @@ function FieldToDoMenuFrame:onFrameOpen()
 end
 
 function FieldToDoMenuFrame:onOpen()
-    if FieldToDoMenuFrame.superClass().onOpen ~= nil then
-        FieldToDoMenuFrame:superClass().onOpen(self)
-    end
-
-    local manager = self:getManager()
-    if manager ~= nil and manager.setOwnedFieldsScanActive ~= nil then
-        manager:setOwnedFieldsScanActive(true)
-    end
-
-    self:pushMenuButtons()
-    self.listRefreshTimer = 0
-    self.fieldRescanTimer = 0
-    self.scsFieldsReady = SeasonalCropStressReader ~= nil and SeasonalCropStressReader.isRuntimeReady()
-    self:bindGuiControls()
-    self:applyMiniButtonIcons()
-    self:updateOptionalColumns()
-    self:finalizeListLayout()
-    self:refreshLists()
+    self:onFrameOpen()
 end
 
 function FieldToDoMenuFrame:syncOwnedFieldsFromScan()
@@ -473,7 +456,8 @@ end
 
 --- Refresh manual tasks only (order/text). Keeps selectedTaskId; used after move/toggle.
 ---@param skipAutoCheck boolean|nil
-function FieldToDoMenuFrame:refreshManualTaskList(skipAutoCheck)
+---@param fullReload boolean|nil use reloadData when open/completed partition changes
+function FieldToDoMenuFrame:refreshManualTaskList(skipAutoCheck, fullReload)
     local manager = self:getManager()
     if manager == nil then
         self.manualTasks = {}
@@ -493,7 +477,7 @@ function FieldToDoMenuFrame:refreshManualTaskList(skipAutoCheck)
     end
 
     if self.taskList ~= nil then
-        self:reloadTaskListData(false)
+        self:reloadTaskListData(fullReload == true)
     end
 end
 
@@ -1540,7 +1524,7 @@ function FieldToDoMenuFrame:onClickToggleTask()
 
     self.selectedTaskId = task.id
     manager:toggleManualTask(task.id)
-    self:refreshManualTaskList()
+    self:refreshManualTaskList(false, true)
 end
 
 function FieldToDoMenuFrame:onClickMoveTaskUp()
@@ -1578,5 +1562,5 @@ function FieldToDoMenuFrame:moveSelectedTask(delta)
     end
 
     self.selectedTaskId = taskId
-    self:refreshManualTaskList()
+    self:refreshManualTaskList(true, false)
 end

@@ -148,12 +148,6 @@ function FieldToDoInGameMenuIntegration.updateMenuFrame(menu, dt)
         return
     end
 
-    local manager = g_currentMission ~= nil and g_currentMission.fieldToDoList or nil
-    if manager ~= nil and manager.ownedFieldsScanActive == true then
-        pcall(screen.onFrameUpdate, screen, dt)
-        return
-    end
-
     if not FieldToDoInGameMenuIntegration.isFieldToDoPageVisible(menu, screen) then
         return
     end

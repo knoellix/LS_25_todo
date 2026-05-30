@@ -123,11 +123,9 @@ function SeasonalCropStressReader.getFieldWorldPosition(field)
         return nil, nil
     end
 
-    if field.getCenterOfFieldWorldPosition ~= nil then
-        local posX, posZ = field:getCenterOfFieldWorldPosition()
-        if posX ~= nil and posZ ~= nil then
-            return posX, posZ
-        end
+    local posX, posZ = FieldAdvisor.getFieldCenterWorldPosition(field)
+    if posX ~= nil and posZ ~= nil then
+        return posX, posZ
     end
 
     if field.posX ~= nil and field.posZ ~= nil then

@@ -1137,8 +1137,8 @@ function ToDoManager:ensureCompletionBaselines()
             local field = self.fieldScanner:getEngineFieldById(task.fieldId)
             local posX = task.worldX
             local posZ = task.worldZ
-            if field ~= nil and field.getCenterOfFieldWorldPosition ~= nil then
-                posX, posZ = field:getCenterOfFieldWorldPosition()
+            if field ~= nil then
+                posX, posZ = FieldAdvisor.getFieldCenterWorldPosition(field)
             end
 
             task.completionBaseline = FieldAdvisor.captureTaskBaseline(field, task.fieldId, posX, posZ)
