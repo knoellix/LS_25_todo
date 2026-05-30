@@ -18,6 +18,9 @@ ToDoManager.XML_KEY = "fieldToDoList"
 ToDoManager.XML_FILENAME = "fieldToDoList.xml"
 ToDoManager.AUTO_CHECK_INTERVAL_MS = 1000
 ToDoManager.OWNED_FIELDS_CACHE_MS = 4000
+ToDoManager.OWNED_FIELDS_SCAN_BATCH_SIZE = 2
+ToDoManager.OWNED_FIELDS_SCAN_INTERVAL_MS = 50
+ToDoManager.OWNED_FIELDS_MENU_RESCAN_MS = 15000
 ToDoManager.SAVE_DEBOUNCE_MS = 2000
 --- Keep at most this many completed rows; oldest completed (lowest sortIndex) is removed.
 ToDoManager.MAX_COMPLETED_TASKS = 10
@@ -43,6 +46,15 @@ function ToDoManager.new(mission, modDirectory, modName)
     self.didEnsureCompletionBaselines = false
     self.ownedFieldsCache = nil
     self.ownedFieldsCacheAt = -1
+    self.fieldAutoCheckCache = {}
+    self.ownedFieldsScanQueue = nil
+    self.ownedFieldsScanIndex = 1
+    self.ownedFieldsScanInProgress = false
+    self.ownedFieldsScanActive = false
+    self.ownedFieldsScanTimer = 0
+    self.ownedFieldsCacheById = nil
+    self.ownedFieldsScanDirty = false
+    self.ownedFieldsOverviewStale = false
 
     return self
 end
@@ -159,6 +171,9 @@ function ToDoManager:onTaskMarkedComplete(task)
     task.completed = true
     self:assignSortIndex(task)
     self:pruneCompletedTasks()
+    if task.source == "field" then
+        self:invalidateFieldAutoCheckCache(tonumber(task.fieldId))
+    end
 end
 
 function ToDoManager:delete()
@@ -290,24 +305,327 @@ end
 function ToDoManager:invalidateOwnedFieldsCache()
     self.ownedFieldsCache = nil
     self.ownedFieldsCacheAt = -1
+    self.ownedFieldsScanQueue = nil
+    self.ownedFieldsScanIndex = 1
+    self.ownedFieldsScanInProgress = false
+    self.ownedFieldsCacheById = nil
+    self.ownedFieldsScanDirty = false
+    self.ownedFieldsOverviewStale = false
 end
 
+--- Mark overview data stale (growth day, farmland bought/sold). Refreshes immediately when menu tab is open.
+function ToDoManager:markOwnedFieldsOverviewStale()
+    self.ownedFieldsOverviewStale = true
+    if self.ownedFieldsScanActive ~= true then
+        return
+    end
+
+    -- Do not reset an running incremental scan; apply after it finishes.
+    if self.ownedFieldsScanInProgress == true then
+        return
+    end
+
+    self:invalidateOwnedFieldsCache()
+end
+
+---@return boolean
+function ToDoManager:consumeOwnedFieldsOverviewStale()
+    if self.ownedFieldsOverviewStale ~= true then
+        return false
+    end
+
+    self.ownedFieldsOverviewStale = false
+    return true
+end
+
+---@param active boolean
+function ToDoManager:setOwnedFieldsScanActive(active)
+    self.ownedFieldsScanActive = active == true
+end
+
+---@return boolean
+function ToDoManager:isOwnedFieldsScanInProgress()
+    return self.ownedFieldsScanInProgress == true
+end
+
+---@return boolean
+function ToDoManager:isOwnedFieldsScanDirty()
+    return self.ownedFieldsScanDirty == true
+end
+
+---@return number done
+---@return number total
+---@return boolean inProgress
+function ToDoManager:getOwnedFieldsScanProgress()
+    if self.ownedFieldsScanInProgress ~= true then
+        local total = self.ownedFieldsCache ~= nil and #self.ownedFieldsCache or 0
+        return total, total, false
+    end
+
+    local queue = self.ownedFieldsScanQueue or {}
+    local total = #queue
+    local done = math.max(0, (self.ownedFieldsScanIndex or 1) - 1)
+    return done, total, true
+end
+
+---@return boolean
+function ToDoManager:consumeOwnedFieldsScanDirty()
+    if self.ownedFieldsScanDirty ~= true then
+        return false
+    end
+
+    self.ownedFieldsScanDirty = false
+    return true
+end
+
+---@param dt number
+---@param maxBatchesPerTick number|nil
+---@return boolean
+function ToDoManager:tickOwnedFieldsScan(dt, maxBatchesPerTick)
+    if self.ownedFieldsScanActive ~= true or self.ownedFieldsScanInProgress ~= true then
+        return false
+    end
+
+    local batchLimit = math.max(1, math.floor(tonumber(maxBatchesPerTick) or 1))
+    self.ownedFieldsScanTimer = (self.ownedFieldsScanTimer or 0) + dt
+    local changed = false
+    local batches = 0
+
+    while self.ownedFieldsScanInProgress
+        and self.ownedFieldsScanTimer >= ToDoManager.OWNED_FIELDS_SCAN_INTERVAL_MS
+        and batches < batchLimit do
+        self.ownedFieldsScanTimer = self.ownedFieldsScanTimer - ToDoManager.OWNED_FIELDS_SCAN_INTERVAL_MS
+        if self:advanceOwnedFieldsScan() then
+            changed = true
+        end
+        batches = batches + 1
+    end
+
+    return changed
+end
+
+function ToDoManager:startOwnedFieldsScan()
+    if self.fieldScanner == nil then
+        self.ownedFieldsScanInProgress = false
+        self.ownedFieldsCache = {}
+        self.ownedFieldsCacheAt = g_time or 0
+        return
+    end
+
+    self.ownedFieldsScanQueue = self.fieldScanner:collectOwnedFieldCandidates()
+    self.ownedFieldsScanIndex = 1
+    self.ownedFieldsScanInProgress = #self.ownedFieldsScanQueue > 0
+    self.ownedFieldsCacheById = {}
+    self.ownedFieldsScanLoggedStart = false
+
+    if self.ownedFieldsCache ~= nil then
+        for _, record in ipairs(self.ownedFieldsCache) do
+            if record ~= nil and record.id ~= nil then
+                self.ownedFieldsCacheById[record.id] = record
+            end
+        end
+    end
+
+    if not self.ownedFieldsScanInProgress then
+        self.ownedFieldsCache = {}
+        self.ownedFieldsCacheAt = g_time or 0
+        self.ownedFieldsScanQueue = nil
+        self.ownedFieldsCacheById = nil
+    else
+        self.ownedFieldsCache = self:buildOwnedFieldsSnapshot()
+        self.ownedFieldsScanDirty = true
+        if self.ownedFieldsScanLoggedStart ~= true and FieldToDoLog ~= nil then
+            self.ownedFieldsScanLoggedStart = true
+            FieldToDoLog.info(
+                "Field overview scan started (%d field(s))",
+                #self.ownedFieldsScanQueue
+            )
+        end
+    end
+end
+
+---@return table[]
+function ToDoManager:buildOwnedFieldsSnapshot()
+    if self.fieldScanner == nil then
+        return self.ownedFieldsCache or {}
+    end
+
+    local fields = {}
+    local queue = self.ownedFieldsScanQueue
+    local cacheById = self.ownedFieldsCacheById or {}
+
+    if queue ~= nil then
+        for _, candidate in ipairs(queue) do
+            local record = cacheById[candidate.id]
+            if record == nil then
+                record = self.fieldScanner:buildPlaceholderFieldRecord(candidate)
+            end
+            if record ~= nil then
+                fields[#fields + 1] = record
+            end
+        end
+        return self.fieldScanner:sortFieldRecords(fields)
+    end
+
+    for _, record in pairs(cacheById) do
+        fields[#fields + 1] = record
+    end
+
+    return self.fieldScanner:sortFieldRecords(fields)
+end
+
+---@param maxBatch number|nil
+---@return boolean
+function ToDoManager:advanceOwnedFieldsScan(maxBatch)
+    if self.fieldScanner == nil or self.ownedFieldsScanInProgress ~= true then
+        return false
+    end
+
+    local queue = self.ownedFieldsScanQueue
+    if queue == nil or #queue == 0 then
+        self.ownedFieldsScanInProgress = false
+        return false
+    end
+
+    local batchSize = math.max(1, math.floor(tonumber(maxBatch) or ToDoManager.OWNED_FIELDS_SCAN_BATCH_SIZE))
+    local scanIndex = self.ownedFieldsScanIndex or 1
+    local processed = 0
+    local changed = false
+
+    while processed < batchSize and scanIndex <= #queue do
+        local candidate = queue[scanIndex]
+        local ok, record = pcall(function()
+            return self.fieldScanner:normalizeField(candidate.field, candidate.forceInclude)
+        end)
+        if ok and record ~= nil then
+            if self.ownedFieldsCacheById == nil then
+                self.ownedFieldsCacheById = {}
+            end
+            self.ownedFieldsCacheById[record.id] = record
+            changed = true
+        end
+        scanIndex = scanIndex + 1
+        processed = processed + 1
+    end
+
+    self.ownedFieldsScanIndex = scanIndex
+
+    if scanIndex > #queue then
+        self.ownedFieldsScanInProgress = false
+        self.ownedFieldsCache = self:buildOwnedFieldsSnapshot()
+        self.ownedFieldsCacheAt = g_time or 0
+        self.ownedFieldsScanQueue = nil
+        self.ownedFieldsCacheById = nil
+        self.ownedFieldsScanLoggedStart = false
+        changed = true
+        if FieldToDoLog ~= nil then
+            FieldToDoLog.info("Field overview scan complete (%d field(s))", #queue)
+        end
+        if self.ownedFieldsOverviewStale == true then
+            self:invalidateOwnedFieldsCache()
+            self:startOwnedFieldsScan()
+        end
+    elseif changed then
+        self.ownedFieldsCache = self:buildOwnedFieldsSnapshot()
+    end
+
+    if changed then
+        self.ownedFieldsScanDirty = true
+    end
+
+    return changed
+end
+
+function ToDoManager:runOwnedFieldsScanImmediate()
+    self:startOwnedFieldsScan()
+    while self.ownedFieldsScanInProgress do
+        self:advanceOwnedFieldsScan(9999)
+    end
+end
+
+---@param fieldId number|nil
+---@return table|nil
+function ToDoManager:refreshFieldRecordSync(fieldId)
+    if fieldId == nil or self.fieldScanner == nil then
+        return nil
+    end
+
+    local engineField = self.fieldScanner:getEngineFieldById(fieldId)
+    if engineField == nil then
+        return nil
+    end
+
+    local ok, record = pcall(function()
+        return self.fieldScanner:normalizeField(engineField, true)
+    end)
+    if not ok or record == nil then
+        return nil
+    end
+
+    if self.ownedFieldsCacheById ~= nil then
+        self.ownedFieldsCacheById[fieldId] = record
+        self.ownedFieldsCache = self:buildOwnedFieldsSnapshot()
+        self.ownedFieldsScanDirty = true
+    elseif self.ownedFieldsCache ~= nil then
+        local replaced = false
+        for index, existing in ipairs(self.ownedFieldsCache) do
+            if existing.id == fieldId then
+                self.ownedFieldsCache[index] = record
+                replaced = true
+                break
+            end
+        end
+        if not replaced then
+            self.ownedFieldsCache[#self.ownedFieldsCache + 1] = record
+            self.ownedFieldsCache = self.fieldScanner:sortFieldRecords(self.ownedFieldsCache)
+        end
+    end
+
+    return record
+end
+
+---@param fieldId number|nil
+function ToDoManager:invalidateFieldAutoCheckCache(fieldId)
+    if self.fieldAutoCheckCache == nil then
+        self.fieldAutoCheckCache = {}
+        return
+    end
+
+    if fieldId == nil then
+        self.fieldAutoCheckCache = {}
+        return
+    end
+
+    self.fieldAutoCheckCache[fieldId] = nil
+end
+
+---@param forceComplete boolean|nil
 ---@return table[] fields
-function ToDoManager:getOwnedFields()
+function ToDoManager:getOwnedFields(forceComplete)
     if self.fieldScanner == nil then
         return {}
     end
 
+    if forceComplete == true then
+        self:runOwnedFieldsScanImmediate()
+        return self.ownedFieldsCache or {}
+    end
+
     local now = g_time or 0
-    if self.ownedFieldsCache ~= nil
+    local cacheValid = self.ownedFieldsCache ~= nil
         and self.ownedFieldsCacheAt >= 0
-        and now - self.ownedFieldsCacheAt <= ToDoManager.OWNED_FIELDS_CACHE_MS then
+        and self.ownedFieldsScanInProgress ~= true
+        and now - self.ownedFieldsCacheAt <= ToDoManager.OWNED_FIELDS_CACHE_MS
+
+    if cacheValid then
         return self.ownedFieldsCache
     end
 
-    self.ownedFieldsCache = self.fieldScanner:scanOwnedFields()
-    self.ownedFieldsCacheAt = now
-    return self.ownedFieldsCache
+    if self.ownedFieldsScanInProgress ~= true then
+        self:startOwnedFieldsScan()
+    end
+
+    return self.ownedFieldsCache or {}
 end
 
 ---@param text string
@@ -385,6 +703,10 @@ function ToDoManager:addTaskFromFieldAction(fieldRecord, action, allowUntrackabl
         return nil, "missing_field"
     end
 
+    if fieldRecord.pendingScan == true then
+        fieldRecord = self:refreshFieldRecordSync(fieldRecord.id) or fieldRecord
+    end
+
     if action == nil then
         action = {
             actionType = fieldRecord.actionType or "none",
@@ -436,6 +758,7 @@ function ToDoManager:addTaskFromFieldAction(fieldRecord, action, allowUntrackabl
     self.nextTaskId = self.nextTaskId + 1
     self:assignSortIndex(task)
     self:requestDebouncedSave()
+    self:invalidateFieldAutoCheckCache(fieldRecord.id)
 
     return task, nil
 end
@@ -476,6 +799,7 @@ function ToDoManager:addCustomFieldTask(fieldRecord, text, actionType, autoCompl
     self.nextTaskId = self.nextTaskId + 1
     self:assignSortIndex(task)
     self:requestDebouncedSave()
+    self:invalidateFieldAutoCheckCache(fieldRecord.id)
 
     return task
 end
@@ -487,19 +811,60 @@ function ToDoManager:updateAutoCompletion()
     end
 
     local completedCount = 0
-    local pendingIds = {}
+    local tasksByFieldId = {}
 
     for taskId, task in pairs(self.manualTasks) do
         if not task.completed and task.source == "field" and task.autoComplete == true then
-            pendingIds[#pendingIds + 1] = taskId
+            local fieldId = tonumber(task.fieldId)
+            if fieldId ~= nil then
+                if tasksByFieldId[fieldId] == nil then
+                    tasksByFieldId[fieldId] = {}
+                end
+                tasksByFieldId[fieldId][#tasksByFieldId[fieldId] + 1] = taskId
+            end
         end
     end
 
-    for _, taskId in ipairs(pendingIds) do
-        local task = self.manualTasks[taskId]
-        if task ~= nil and not task.completed and FieldAdvisor.isFieldTaskComplete(task, self.fieldScanner) then
-            self:onTaskMarkedComplete(task)
-            completedCount = completedCount + 1
+    for fieldId, taskIds in pairs(tasksByFieldId) do
+        local field = self.fieldScanner:getEngineFieldById(fieldId)
+        local fieldCache = nil
+
+        if field ~= nil and field.getCenterOfFieldWorldPosition ~= nil then
+            local posX, posZ = field:getCenterOfFieldWorldPosition()
+            if posX ~= nil and posZ ~= nil and FieldTaskCompletion ~= nil then
+                fieldCache = FieldTaskCompletion.newFieldCompletionCache(field, posX, posZ)
+                local fieldState = FieldAdvisor.getEnrichedFieldState(field, fieldId, posX, posZ)
+                fieldCache.fieldState = fieldState
+                fieldCache.fingerprint = FieldAdvisor.buildFieldCompletionFingerprint(fieldState)
+
+                local previousCheck = self.fieldAutoCheckCache[fieldId]
+                fieldCache.fingerprintMatch = previousCheck ~= nil
+                    and previousCheck.fingerprint == fieldCache.fingerprint
+                if fieldCache.fingerprintMatch and previousCheck.ratios ~= nil then
+                    fieldCache.ratios = previousCheck.ratios
+                end
+            end
+        end
+
+        local fieldCompleted = false
+        for _, taskId in ipairs(taskIds) do
+            local task = self.manualTasks[taskId]
+            if task ~= nil and not task.completed and FieldAdvisor.isFieldTaskComplete(task, self.fieldScanner, fieldCache) then
+                self:onTaskMarkedComplete(task)
+                fieldCompleted = true
+                completedCount = completedCount + 1
+            end
+        end
+
+        if fieldCompleted then
+            self:refreshFieldRecordSync(fieldId)
+        end
+
+        if fieldCache ~= nil and fieldCache.fingerprint ~= nil then
+            self.fieldAutoCheckCache[fieldId] = {
+                fingerprint = fieldCache.fingerprint,
+                ratios = fieldCache.ratios,
+            }
         end
     end
 
@@ -541,6 +906,14 @@ function ToDoManager:update(dt)
     if not self.didEnsureCompletionBaselines then
         self.didEnsureCompletionBaselines = true
         self:ensureCompletionBaselines()
+    end
+
+    if self.ownedFieldsScanActive == true and self.ownedFieldsScanInProgress == true then
+        local scanChanged = self:tickOwnedFieldsScan(dt, 1)
+        if scanChanged and FieldToDoInGameMenuIntegration ~= nil
+            and FieldToDoInGameMenuIntegration.syncFieldListFromScan ~= nil then
+            FieldToDoInGameMenuIntegration.syncFieldListFromScan()
+        end
     end
 
     self.autoCheckTimer = self.autoCheckTimer + dt
@@ -997,8 +1370,33 @@ local function onSaveMission(missionInfo)
     end
 end
 
+local function subscribeOverviewStaleEvents()
+    if g_messageCenter == nil or MessageType == nil then
+        return
+    end
+
+    local function markOverviewStale()
+        if todoManager ~= nil and todoManager.markOwnedFieldsOverviewStale ~= nil then
+            todoManager:markOwnedFieldsOverviewStale()
+        end
+    end
+
+    local eventNames = {
+        "FINISHED_GROWTH_PERIOD",
+        "FARMLAND_OWNER_CHANGED",
+    }
+
+    for _, eventName in ipairs(eventNames) do
+        local messageType = MessageType[eventName]
+        if messageType ~= nil then
+            g_messageCenter:subscribe(messageType, markOverviewStale)
+        end
+    end
+end
+
 local function init()
     ToDoManager.initXMLSchema()
+    subscribeOverviewStaleEvents()
 
     FSBaseMission.delete = Utils.appendedFunction(FSBaseMission.delete, unload)
     Mission00.load = Utils.prependedFunction(Mission00.load, load)

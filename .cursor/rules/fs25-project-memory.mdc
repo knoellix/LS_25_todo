@@ -37,6 +37,27 @@ Optional second paragraph in the same string."
 - Avoid SCS field-map loops in menu/update paths (`buildFieldMap`/`enumerateFields`).
 - Keep deferred startup reads (`deferReadsUntilGameplay`) to avoid load deadlocks.
 
+## Performance (Field Overview Scan)
+
+- **Two update paths (do not merge):**
+  - **Overview scan** — all owned fields for the ESC table (incremental, heavier). Runs on menu open and optional periodic full rescan.
+  - **Task auto-complete** — only fields with open trackable field tasks (`updateAutoCompletion`, ~1 s). Uses live probes + fingerprint cache; independent of the overview queue.
+- When auto-complete marks a field task done, **refresh that field row only** via `refreshFieldRecordSync(fieldId)` — do not wait for the 5 s rescan or a full cache invalidate.
+- Field overview uses **incremental scan** (`ToDoManager` + `FieldScanner.collectOwnedFieldCandidates()`), not a synchronous full `scanOwnedFields()` on every menu refresh.
+- **Overview grid** uses `OVERVIEW_SAMPLE_GRID_STEPS` (3); **completion / auto-complete** keeps full grid (5). Do not raise overview grid without measuring.
+- **Probe aggregation** may use short TTL cache (`PROBE_AGGREGATION_CACHE_TTL_MS`); refresh center/harvest from live center probe on cache hit.
+- **Scan pacing:** `OWNED_FIELDS_SCAN_BATCH_SIZE` (2), `OWNED_FIELDS_SCAN_INTERVAL_MS` (50), `OWNED_FIELDS_CACHE_MS` (4000). Advance via `ToDoManager:tickOwnedFieldsScan(dt, 1)` while the menu tab is open (`setOwnedFieldsScanActive(true)` on open, `false` on close). UI sync runs from **`InGameMenu.update`** (and mission-update fallback) calling `FieldToDoMenuFrame:onFrameUpdate` — custom tab pages do not receive frame updates from the engine alone.
+- **UI refresh during scan:** on batch progress call `fieldList:reloadData()` — **`reloadVisibleItems()` does not reliably update** cell text when `...` placeholders become real values.
+- **`deferredListReload` must call `refreshLists(false)`** — never invalidate the owned-fields cache on the 500 ms poll (that reset the scan every tick and blocked gradual fill-in).
+- **Passive refresh while menu open:** full invalidate at most every `OWNED_FIELDS_MENU_RESCAN_MS` (15 s default) — enough for fields without open tasks. Fields with auto-complete tasks refresh via `refreshFieldRecordSync` on completion.
+- **No vanilla “field worked” event** — plow/mow while menu open on a field *without* a task waits for the periodic rescan or menu re-open. Engine hooks: `MessageType.FINISHED_GROWTH_PERIOD` (daily growth) and `MessageType.FARMLAND_OWNER_CHANGED` → `markOwnedFieldsOverviewStale()` (immediate rescan if tab open).
+- First paint: all owned field rows appear immediately with placeholders (`pendingScan`, columns `...`); values replace placeholders batch by batch.
+- **Scan indicator:** yellow blinking dot (●) next to „Feldübersicht“ while scan runs; solid green when complete. Tooltip shows progress (`ftdl_scan_status_scanning`).
+- Scan start/complete: one `FieldToDoLog.info` line each (visible in `log.txt`).
+- Task adopt on pending row: `refreshFieldRecordSync(fieldId)` before `addTaskFromFieldAction`.
+- Debug / `ftdlAll`: `getOwnedFields(true)` for synchronous full scan only.
+- **Auto-complete:** group tasks by `fieldId`; reuse completion ratios via fingerprint cache; always refresh coverage (plow/sow) polygon queries even when fingerprint matches.
+
 ## UI and To-Do Behavior
 
 - To-do ordering is based on `sortIndex` (user order), not work-order presets.
@@ -71,6 +92,11 @@ Optional second paragraph in the same string."
   - ETA steps target **`minHarvestingGrowthState`** when `getIsHarvestReady` exists (grain-ready), not `maxHarvestingGrowthState` (may include dead/withered).
   - Always pass **`aggregation.harvestState`** (via `resolveHarvestFieldState`) into harvest-window helpers — not `representativeState`.
 - Grass residue flow must distinguish `loose` vs `swath` vs `baled` vs `none` from live map data (`DensityMapHeightUtil` + windrow fill levels), not a single generic grass-rest state.
+- **Grass residue detection (`detectGrassResidue` + `fuseGrassResidueSignals`):**
+  - Scan: cross (E–W, N–S) + diagonal bars through field center (~85 probe points active).
+  - Signals: windrow liters (`DensityMapHeightUtil`), engine height (`getDensityHeightAtWorldPos`), fill-type at point (`getDensityTypeIndexAtWorldPos`), `stubbleShredLevel`, field bales.
+  - Fusion: **never default to `loose`** without positive material; cut + no signal → `none` (Nachwuchs only). `swath` from sparse line hits, windrow fill-type, or shred. `loose` only from dense scattered coverage.
+  - Proton: `DensityMapHeightUtil` global may be nil — use engine height/fill-type fallbacks; do not treat unavailable map as empty loose pile.
 - Post-mow suggestions must follow residue state:
   - `loose` -> `grass_swath`
   - `swath` -> show all three options (`grass_collect`/Ladewagen, `grass_bale`, `grass_silage_bale`)

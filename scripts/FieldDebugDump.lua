@@ -175,7 +175,7 @@ function FieldDebugDump.dumpField(fieldId)
     local grassResidue = context ~= nil and context.grassResidueSummary or nil
     if grassResidue ~= nil then
         out(string.format(
-            "grassResidue: available=%s source=%s state=%s total=%s occupied=%s ratio=%.3f liters=%.3f maxSample=%.3f swathHits=%s crossPts=%s fillTypes=%d",
+            "grassResidue: available=%s source=%s state=%s total=%s occupied=%s ratio=%.3f liters=%.3f maxSample=%.3f maxMaterial=%.4f swathHits=%s windrowHits=%s shred=%s crossPts=%s fillTypes=%d",
             s(grassResidue.residueAvailable),
             s(grassResidue.residueSource),
             s(grassResidue.residueState),
@@ -184,18 +184,14 @@ function FieldDebugDump.dumpField(fieldId)
             grassResidue.occupiedRatio or 0,
             grassResidue.totalLiters or 0,
             grassResidue.maxSampleLiters or 0,
+            grassResidue.maxSampleMaterial or 0,
             s(grassResidue.swathHits),
+            s(grassResidue.windrowTypeHits),
+            s(grassResidue.signalShred),
             s(grassResidue.crossScanPoints),
             #(FieldAdvisor.collectWindrowFillTypeIndices(
                 FieldAdvisor.resolveGrassFruitTypeIndex(fieldState, field, aggregation, worldX, worldZ)
             ))
-        ))
-        local crossMaterial, crossLiters, crossPoints = FieldAdvisor.scanCrossForMaxGrassMaterial(
-            field, worldX, worldZ, FieldAdvisor.GRASS_RESIDUE_CROSS_STEPS
-        )
-        out(string.format(
-            "grassCrossScan: points=%d maxMaterial=%.4f maxLiters=%.3f",
-            crossPoints, crossMaterial, crossLiters
         ))
     end
     if weedSummary ~= nil then

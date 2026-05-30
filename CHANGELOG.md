@@ -2,6 +2,33 @@
 
 All notable changes to **FS25_FieldToDoList** are documented here.
 
+## [0.1.0.5] — 2026-05-30
+
+### Added
+
+- **Incremental field overview scan:** all owned fields appear immediately with `…` placeholders, then fill in batch-by-batch while the ESC tab is open.
+- **Scan status indicator:** yellow blinking dot next to „Feldübersicht“ / „Field overview“ while scanning; solid green when done (tooltip shows progress, e.g. `12/45`).
+- **Event-driven refresh:** `FINISHED_GROWTH_PERIOD` and `FARMLAND_OWNER_CHANGED` mark the overview stale (immediate rescan if tab open).
+- Scan start/complete lines in `log.txt` (`FieldToDoLog.info`).
+
+### Improved
+
+- Field overview **performance:** lighter 3×3 probe grid for display (5×5 kept for auto-complete); probe aggregation, fruit-name, and completion fingerprint caches.
+- **Auto-complete → overview sync:** when a field task is marked done, only that field row is re-read (`refreshFieldRecordSync`) — no wait for a full rescan.
+- Passive full rescan while menu open: **5 s → 15 s** (enough for fields without open tasks).
+- Menu updates: `InGameMenu.update` + mission-update fallback drive `onFrameUpdate` on custom tab pages.
+
+### Fixed
+
+- Field list stuck on `…` placeholders (deferred reload no longer invalidates scan cache every 500 ms; `reloadData()` instead of `reloadVisibleItems()` on scan progress).
+- Overview scan not advancing when ESC tab was open (scan tick + UI sync wiring).
+- Scan reset loop when growth/ownership events fired during incremental scan; UI sync no longer depends on fragile page-visibility checks (`ownedFieldsScanActive` + direct list sync after tick).
+
+### Known limitations
+
+- Grass swath → collect/bale chain still being tuned on some maps/Proton; use `ftdlDump` for diagnosis.
+- Field worked **without** an open task may take up to ~15 s to refresh in the overview while the menu stays open.
+
 ## [0.1.0.4] — 2026-05-29
 
 ### Added
@@ -58,6 +85,7 @@ All notable changes to **FS25_FieldToDoList** are documented here.
 
 - Initial public pre-release: ESC to-do list, field overview, HUD, work-order presets, PF/SCS columns (limited), grass-aware suggestions.
 
+[0.1.0.5]: https://github.com/knoellix/FS25_FieldToDoList/compare/v0.1.0.4...v0.1.0.5
 [0.1.0.4]: https://github.com/knoellix/FS25_FieldToDoList/compare/v0.1.0.3...v0.1.0.4
 [0.1.0.3]: https://github.com/knoellix/FS25_FieldToDoList/compare/v0.1.0.2...v0.1.0.3
 [0.1.0.2]: https://github.com/knoellix/FS25_FieldToDoList/releases/tag/v0.1.0.2

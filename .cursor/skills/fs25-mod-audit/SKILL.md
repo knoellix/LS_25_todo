@@ -57,6 +57,9 @@ Dateien: alle `scripts/*.lua`, v. a. `FieldSavegameReader.lua`, `ToDoManager.lua
 - `deferDiskReads` nur clearen wenn `ENABLE_DISK_READ == true`.
 - Keine SCS-Feldmap-Loops (`buildFieldMap`/`enumerateFields`) in Menü-/Update-Pfaden.
 - Keine wiederholten/Schleifen-Datei-Reads in Menü-/Update-Pfaden; Live-`FieldState`/Engine bevorzugen.
+- **Inkrementeller Feld-Scan:** kein synchrones Voll-`normalizeField` pro Menü-Refresh; Queue + Batch in `ToDoManager`.
+- **`deferredListReload` darf den Feld-Cache nicht invalidieren** (`refreshLists(false)`); nur expliziter Rescan (z. B. 5 s) mit `refreshLists(true)`.
+- Scan-Tick nur aus **`FieldToDoMenuFrame:onFrameUpdate`** (`tickOwnedFieldsScan`), nicht ungebremst in `ToDoManager:update` drainen.
 - `Logging.info`/`Logging.warning` statt `print()` (besonders `InGameMenuIntegration`).
 - Engine-Calls in `pcall`; keine harten Crashes bei `nil` Globals.
 - Debug: **F9** / `ftdlDump` nur manuell — kein Auto-Dump in Menü-/Load-Pfaden.
@@ -127,6 +130,11 @@ Dateien: `gui/FieldToDoMenuFrame.lua` + `.xml`, `ToDoManager.lua`,
 - Mini-Button Hoch/Runter: Pfeil-Icons (↑/↓) mit L10n-Tooltip (`$l10n_ftdl_btn_up`/`down`), kein Drag-and-drop.
 - HUD: nur **offene** manuelle Tasks (`getManualTasksForDisplay`), max 5 — kein Fallback auf erledigte.
 - Offene Tasks über erledigten; erledigte cap 10; neueste erledigte oben.
+- **Inkrementeller Feld-Scan (Performance):**
+  - `setOwnedFieldsScanActive` on menu open/close; `tickOwnedFieldsScan(dt, 1)` in `onFrameUpdate`.
+  - `syncOwnedFieldsFromScan` / `reloadData()` when scan dirty — not `reloadVisibleItems()` for placeholder → value updates.
+  - `deferredListReload` → `refreshLists(false)` (must not call default invalidate every 500 ms).
+  - Placeholders visible immediately; real labels fill batch-by-batch (not stuck on `...`, not instant full sync unless `getOwnedFields(true)`).
 
 ---
 
@@ -137,8 +145,7 @@ Dateien: `gui/FieldToDoMenuFrame.lua` + `.xml`, `ToDoManager.lua`,
 - Field 9 gespritzter Weizen: Unkraut **tot**, keine Combat-Empfehlung bei ≤5 % live.
 - Gras-Logistik: `loose → swath → collect/bale → bale_collect` konsistent.
 - `ftdlDump` vs UI: Ernte-Monat muss übereinstimmen (Center-Probe).
-
----
+- **Feldliste Menü:** Zeilen mit `...` füllen sich schrittweise (ca. 2 Felder / 50 ms); kein Dauer-Reset beim Öffnen.
 
 ## Subagent-Prompt-Vorlage
 Pro Dimension einen `Task` starten (parallel, readonly):
@@ -160,7 +167,7 @@ Bei Diff-Audit zusätzlich: „Beschränke dich auf diese geänderten Stellen: <
 ## Schweregrade
 - 🔴 **Bug**: falsches Verhalten / Crash-/Save-Risiko (z. B. Runtime-`fields.xml`-Read,
   Static-Call mit `self`, Silage-Fenster als Körner-Ernte, `NONE`-Residue als complete).
-- 🟠 **Risiko**: fragil / Regressionsgefahr (fehlender `pcall`, Loop-Reads in Menüpfad).
+- 🟠 **Risiko**: fragil / Regressionsgefahr (fehlender `pcall`, Loop-Reads in Menüpfad, Scan-Cache-Invalidierung in Poll-Loops, `reloadVisibleItems` statt `reloadData` beim Scan).
 - 🟡 **Verbesserung**: Logik-/Lesbarkeits-Schliff, Doppelpfade.
 - ⚪ **Hinweis**: Stil, Doku, Kleinigkeiten.
 

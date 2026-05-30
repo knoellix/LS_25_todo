@@ -10,6 +10,7 @@ FieldToDoInGameMenuIntegration.CLASS_NAME = "FieldToDoMenuFrame"
 FieldToDoInGameMenuIntegration.XML_FILENAME = "gui/FieldToDoMenuFrame.xml"
 FieldToDoInGameMenuIntegration.MENU_ICON_PATH = "gui/menuIcon.dds"
 FieldToDoInGameMenuIntegration.MENU_ICON_UVS = { 0, 0, 1024, 1024 }
+FieldToDoInGameMenuIntegration.menuScreen = nil
 
 local LOG_PREFIX = "[FS25_FieldToDoList]"
 local pendingRegistration = false
@@ -76,6 +77,83 @@ local function isScreenRegistered(inGameMenu, screen)
     return false
 end
 
+---@param menu table|nil
+---@param screen table|nil
+---@return boolean
+function FieldToDoInGameMenuIntegration.isFieldToDoPageVisible(menu, screen)
+    if screen == nil then
+        return false
+    end
+
+    if menu ~= nil then
+        if menu.currentPage == screen or menu.pageFrame == screen then
+            return true
+        end
+
+        local paging = menu.pagingElement
+        if paging ~= nil then
+            if paging.currentPage == screen or paging.currentElement == screen then
+                return true
+            end
+
+            if paging.getCurrentPageIndex ~= nil and paging.elements ~= nil then
+                local pageIndex = paging:getCurrentPageIndex()
+                if pageIndex ~= nil and paging.elements[pageIndex + 1] == screen then
+                    return true
+                end
+            end
+        end
+    end
+
+    if type(screen.getIsVisible) == "function" and screen:getIsVisible() == true then
+        return true
+    end
+
+    return screen.isVisible == true
+end
+
+function FieldToDoInGameMenuIntegration.syncFieldListFromScan()
+    local screen = FieldToDoInGameMenuIntegration.menuScreen
+    if screen == nil and g_inGameMenu ~= nil then
+        screen = g_inGameMenu[FieldToDoInGameMenuIntegration.MENU_PAGE_NAME]
+    end
+
+    if screen == nil or type(screen.syncOwnedFieldsFromScan) ~= "function" then
+        return
+    end
+
+    pcall(screen.syncOwnedFieldsFromScan, screen)
+end
+
+---@param menu table|nil
+---@param dt number|nil
+function FieldToDoInGameMenuIntegration.updateMenuFrame(menu, dt)
+    if dt == nil or dt <= 0 then
+        return
+    end
+
+    local screen = FieldToDoInGameMenuIntegration.menuScreen
+    if screen == nil and menu ~= nil then
+        screen = menu[FieldToDoInGameMenuIntegration.MENU_PAGE_NAME]
+    end
+
+    if screen == nil or type(screen.onFrameUpdate) ~= "function" then
+        return
+    end
+
+    local manager = g_currentMission ~= nil and g_currentMission.fieldToDoList or nil
+    if manager ~= nil and manager.ownedFieldsScanActive == true then
+        pcall(screen.onFrameUpdate, screen, dt)
+        return
+    end
+
+    if not FieldToDoInGameMenuIntegration.isFieldToDoPageVisible(menu, screen) then
+        return
+    end
+
+    pcall(screen.onFrameUpdate, screen, dt)
+end
+
 ---@param modDirectory string
 ---@return boolean
 function FieldToDoInGameMenuIntegration.performRegistration(modDirectory)
@@ -131,6 +209,7 @@ function FieldToDoInGameMenuIntegration.performRegistration(modDirectory)
     end
 
     inGameMenu[FieldToDoInGameMenuIntegration.MENU_PAGE_NAME] = screen
+    FieldToDoInGameMenuIntegration.menuScreen = screen
 
     local alreadyAdded = false
     if inGameMenu.pagingElement.elements ~= nil then
@@ -231,6 +310,15 @@ if InGameMenu ~= nil and InGameMenu.onGuiSetupFinished ~= nil then
     end)
 end
 
-FSBaseMission.update = Utils.appendedFunction(FSBaseMission.update, function()
+if InGameMenu ~= nil and InGameMenu.update ~= nil then
+    InGameMenu.update = Utils.appendedFunction(InGameMenu.update, function(menu, dt)
+        FieldToDoInGameMenuIntegration.updateMenuFrame(menu, dt)
+    end)
+end
+
+FSBaseMission.update = Utils.appendedFunction(FSBaseMission.update, function(_, dt)
     FieldToDoInGameMenuIntegration.attemptDeferredRegister()
+    if g_inGameMenu ~= nil and dt ~= nil then
+        FieldToDoInGameMenuIntegration.updateMenuFrame(g_inGameMenu, dt)
+    end
 end)

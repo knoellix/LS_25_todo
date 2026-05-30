@@ -42,6 +42,7 @@ function FieldToDoMenuFrame.new()
     self.deferredListReload = false
     self.deferredListReloadTimer = 0
     self.deferredListReloadAttempts = 0
+    self.fieldScanBlinkTimer = 0
 
     return self
 end
@@ -245,6 +246,10 @@ end
 
 function FieldToDoMenuFrame:onFrameOpen()
     FieldToDoMenuFrame:superClass().onFrameOpen(self)
+    local manager = self:getManager()
+    if manager ~= nil and manager.setOwnedFieldsScanActive ~= nil then
+        manager:setOwnedFieldsScanActive(true)
+    end
     self:pushMenuButtons()
     self.listRefreshTimer = 0
     self.fieldRescanTimer = 0
@@ -256,12 +261,21 @@ function FieldToDoMenuFrame:onFrameOpen()
     self:applyMiniButtonIcons()
     self:updateOptionalColumns()
     self:finalizeListLayout()
-    self:refreshLists()
+    if manager ~= nil and manager.consumeOwnedFieldsOverviewStale ~= nil and manager:consumeOwnedFieldsOverviewStale() then
+        self:refreshLists(true)
+    else
+        self:refreshLists()
+    end
 end
 
 function FieldToDoMenuFrame:onOpen()
     if FieldToDoMenuFrame.superClass().onOpen ~= nil then
         FieldToDoMenuFrame:superClass().onOpen(self)
+    end
+
+    local manager = self:getManager()
+    if manager ~= nil and manager.setOwnedFieldsScanActive ~= nil then
+        manager:setOwnedFieldsScanActive(true)
     end
 
     self:pushMenuButtons()
@@ -275,8 +289,79 @@ function FieldToDoMenuFrame:onOpen()
     self:refreshLists()
 end
 
+function FieldToDoMenuFrame:syncOwnedFieldsFromScan()
+    local manager = self:getManager()
+    if manager == nil then
+        return false
+    end
+
+    self.ownedFields = manager:getOwnedFields()
+
+    if self.fieldEmptyHint ~= nil then
+        self.fieldEmptyHint:setVisible(#self.ownedFields == 0)
+    end
+
+    if self.fieldList == nil then
+        return false
+    end
+
+    if manager:consumeOwnedFieldsScanDirty() then
+        self.fieldList:reloadData()
+        return true
+    end
+
+    return false
+end
+
+---@param dt number
+---@param manager ToDoManager|nil
+function FieldToDoMenuFrame:updateFieldScanIndicator(dt, manager)
+    if self.fieldScanStatusDot == nil then
+        return
+    end
+
+    manager = manager or self:getManager()
+    local scanning = manager ~= nil and manager:isOwnedFieldsScanInProgress()
+    self.fieldScanStatusDot:setVisible(true)
+
+    if scanning then
+        self.fieldScanBlinkTimer = (self.fieldScanBlinkTimer or 0) + dt
+        local phase = math.floor(self.fieldScanBlinkTimer / 400) % 2
+        if phase == 0 then
+            self.fieldScanStatusDot:setTextColor(0.95, 0.82, 0.15, 1.0)
+        else
+            self.fieldScanStatusDot:setTextColor(0.95, 0.82, 0.15, 0.25)
+        end
+
+        if manager.getOwnedFieldsScanProgress ~= nil then
+            local done, total = manager:getOwnedFieldsScanProgress()
+            if total > 0 and self.fieldScanStatusDot.setToolTipText ~= nil then
+                self.fieldScanStatusDot:setToolTipText(
+                    string.format(g_i18n:getText("ftdl_scan_status_scanning"), done, total)
+                )
+            end
+        end
+        return
+    end
+
+    self.fieldScanBlinkTimer = 0
+    self.fieldScanStatusDot:setTextColor(0.25, 0.85, 0.35, 1.0)
+    if self.fieldScanStatusDot.setToolTipText ~= nil then
+        self.fieldScanStatusDot:setToolTipText(g_i18n:getText("ftdl_scan_status_ready"))
+    end
+end
+
 function FieldToDoMenuFrame:onFrameUpdate(dt)
     FieldToDoMenuFrame:superClass().onFrameUpdate(self, dt)
+
+    local manager = self:getManager()
+    if manager ~= nil then
+        if manager:consumeOwnedFieldsOverviewStale() then
+            self:refreshLists(true)
+        end
+        self:syncOwnedFieldsFromScan()
+        self:updateFieldScanIndicator(dt, manager)
+    end
 
     if self.deferredListReload then
         self.deferredListReloadTimer = self.deferredListReloadTimer + dt
@@ -284,9 +369,9 @@ function FieldToDoMenuFrame:onFrameUpdate(dt)
             self.deferredListReloadTimer = 0
             self.deferredListReloadAttempts = self.deferredListReloadAttempts + 1
             self:pushMenuButtons()
-            self:refreshLists()
-            local manager = self:getManager()
-            local hasFields = manager ~= nil and #self.ownedFields > 0
+            self:refreshLists(false)
+            local deferredManager = self:getManager()
+            local hasFields = deferredManager ~= nil and #self.ownedFields > 0
             if hasFields or self.deferredListReloadAttempts >= 30 then
                 self.deferredListReload = false
             end
@@ -294,7 +379,7 @@ function FieldToDoMenuFrame:onFrameUpdate(dt)
         return
     end
 
-    local manager = self:getManager()
+    manager = self:getManager()
     if manager == nil then
         return
     end
@@ -308,17 +393,27 @@ function FieldToDoMenuFrame:onFrameUpdate(dt)
     local completedCount = manager:updateAutoCompletion()
 
     self.fieldRescanTimer = (self.fieldRescanTimer or 0) + 1000
-    local shouldRescanFields = self.fieldRescanTimer >= 5000
+    local rescanMs = ToDoManager.OWNED_FIELDS_MENU_RESCAN_MS or 15000
+    local shouldRescanFields = self.fieldRescanTimer >= rescanMs
     if shouldRescanFields then
         self.fieldRescanTimer = 0
     end
 
     if completedCount > 0 or shouldRescanFields then
-        self:refreshLists(shouldRescanFields)
+        if completedCount > 0 and not shouldRescanFields then
+            self:refreshManualTaskList()
+            self:syncOwnedFieldsFromScan()
+        else
+            self:refreshLists(shouldRescanFields)
+        end
     end
 end
 
 function FieldToDoMenuFrame:onFrameClose()
+    local manager = self:getManager()
+    if manager ~= nil and manager.setOwnedFieldsScanActive ~= nil then
+        manager:setOwnedFieldsScanActive(false)
+    end
     self.selectedTaskId = nil
     self.selectedFieldId = nil
     self.pendingFieldForPicker = nil
@@ -338,6 +433,10 @@ end
 
 function FieldToDoMenuFrame:refreshLists(invalidateFieldsCache)
     local manager = self:getManager()
+    if manager ~= nil and manager.setOwnedFieldsScanActive ~= nil then
+        manager:setOwnedFieldsScanActive(true)
+    end
+
     if invalidateFieldsCache ~= false
         and manager ~= nil
         and manager.invalidateOwnedFieldsCache ~= nil then

@@ -4,7 +4,7 @@
 
 **Autor:** Christian Möllmann ([knoellix](https://github.com/knoellix))  
 **Lizenz:** [GNU GPL v3](LICENSE)  
-**Version:** `0.1.0.4` (Vorabversion)
+**Version:** `0.1.0.5` (Vorabversion)
 
 ## Funktionen
 
@@ -102,7 +102,7 @@ Beiträge sind willkommen (Bugfixes, Features, Übersetzungen).
 
 ## Changelog
 
-Siehe [CHANGELOG.md](CHANGELOG.md). **0.1.0.4:** Debug-Befehle (`ftdlDump`), Gras-Kreuzscan für Schwaden, Ernte-/Nachwuchs-Labels, Unkraut-5%-Regel, Berater-Stabilität.
+Siehe [CHANGELOG.md](CHANGELOG.md). **0.1.0.5:** inkrementeller Feld-Scan, Scan-Status-Punkt, gezieltes Zeilen-Update bei Auto-Erledigt, 15 s Rescan, Performance-Caches.
 
 ## Bekannte Punkte / WIP
 

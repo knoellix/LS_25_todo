@@ -111,7 +111,7 @@ function FieldDebugConsole.executeLine(line)
         if manager == nil or manager.getOwnedFields == nil then
             return "No fieldToDoList manager — load a savegame first."
         end
-        local fields = manager:getOwnedFields()
+        local fields = manager:getOwnedFields(true)
         if fields == nil or #fields == 0 then
             return "No owned fields found."
         end
@@ -180,7 +180,7 @@ function FieldDebugConsole.openCommandDialog()
         if FieldDebugDump ~= nil and FieldDebugDump.dumpAllOwnedFields ~= nil then
             local manager = g_currentMission ~= nil and g_currentMission.fieldToDoList or nil
             if manager ~= nil and manager.getOwnedFields ~= nil then
-                FieldDebugDump.dumpAllOwnedFields(manager:getOwnedFields())
+                FieldDebugDump.dumpAllOwnedFields(manager:getOwnedFields(true))
             end
         end
         return

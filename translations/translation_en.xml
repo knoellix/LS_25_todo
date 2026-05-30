@@ -10,6 +10,8 @@
         <text name="ftdl_menu_title" text="Fields &amp; To-Do"/>
         <text name="ftdl_section_todo" text="To-Do list"/>
         <text name="ftdl_section_fields" text="Field overview"/>
+        <text name="ftdl_scan_status_scanning" text="Reading fields (%d/%d)"/>
+        <text name="ftdl_scan_status_ready" text="Field overview up to date"/>
         <text name="ftdl_col_task" text="Task"/>
         <text name="ftdl_empty_tasks" text="No tasks yet."/>
         <text name="ftdl_btn_add" text="Add"/>

@@ -142,6 +142,130 @@ function FieldScanner:isPlayerOwnedField(field)
 end
 
 ---@param field table
+---@param forceInclude boolean|nil
+---@return table|nil candidate
+function FieldScanner:buildOwnedFieldCandidate(field, forceInclude)
+    if field == nil then
+        return nil
+    end
+
+    if forceInclude ~= true and not self:isPlayerOwnedField(field) then
+        return nil
+    end
+
+    local fieldId = field.getId ~= nil and field:getId() or nil
+    if fieldId == nil then
+        return nil
+    end
+
+    return {
+        field = field,
+        forceInclude = forceInclude == true,
+        id = fieldId,
+    }
+end
+
+--- Cheap ownership list for incremental overview scans.
+---@return table[] candidates
+function FieldScanner:collectOwnedFieldCandidates()
+    local candidates = {}
+    local seenIds = {}
+
+    if g_fieldManager == nil then
+        return candidates
+    end
+
+    local allFields = g_fieldManager.fields
+    if allFields == nil and g_fieldManager.getFields ~= nil then
+        allFields = g_fieldManager:getFields()
+    end
+
+    if allFields ~= nil then
+        for _, field in pairs(allFields) do
+            local candidate = self:buildOwnedFieldCandidate(field, false)
+            if candidate ~= nil and not seenIds[candidate.id] then
+                candidates[#candidates + 1] = candidate
+                seenIds[candidate.id] = true
+            end
+        end
+    end
+
+    if g_currentMission ~= nil and g_currentMission.fieldToDoList ~= nil then
+        local manager = g_currentMission.fieldToDoList
+        if manager.manualTasks ~= nil and manager.fieldScanner == self then
+            for _, task in pairs(manager.manualTasks) do
+                local fieldId = tonumber(task.fieldId)
+                if fieldId ~= nil and not seenIds[fieldId] and not task.completed then
+                    local engineField = self:getEngineFieldById(fieldId)
+                    local candidate = self:buildOwnedFieldCandidate(engineField, true)
+                    if candidate ~= nil then
+                        candidates[#candidates + 1] = candidate
+                        seenIds[candidate.id] = true
+                    end
+                end
+            end
+        end
+    end
+
+    table.sort(candidates, function(a, b)
+        return a.id < b.id
+    end)
+
+    return candidates
+end
+
+---@param candidate table
+---@return table|nil
+function FieldScanner:buildPlaceholderFieldRecord(candidate)
+    if candidate == nil or candidate.field == nil then
+        return nil
+    end
+
+    local field = candidate.field
+    local fieldId = candidate.id
+    local posX, posZ = nil, nil
+    if field.getCenterOfFieldWorldPosition ~= nil then
+        posX, posZ = field:getCenterOfFieldWorldPosition()
+    end
+
+    local fieldName = field.name
+    if string.isNilOrWhitespace(fieldName) then
+        fieldName = string.format("Feld %d", fieldId)
+    end
+
+    return {
+        id = fieldId,
+        name = fieldName,
+        worldX = posX,
+        worldZ = posZ,
+        fruit = "...",
+        growthState = "...",
+        expectedHarvest = "...",
+        weed = "...",
+        stones = "...",
+        lime = "...",
+        roller = "...",
+        suggestion = "...",
+        pendingScan = true,
+        showPrecisionFarming = PrecisionFarmingReader ~= nil and PrecisionFarmingReader.isRuntimeReady(),
+        showCropStress = SeasonalCropStressReader ~= nil and SeasonalCropStressReader.isRuntimeReady(),
+    }
+end
+
+---@param records table[]
+---@return table[]
+function FieldScanner:sortFieldRecords(records)
+    table.sort(records, function(a, b)
+        if a.id == b.id then
+            return (a.name or "") < (b.name or "")
+        end
+        return a.id < b.id
+    end)
+
+    return records
+end
+
+---@param field table
 ---@param forceInclude boolean|nil include even when ownership probe fails (open To-Do on this field)
 ---@return table|nil fieldRecord
 function FieldScanner:normalizeField(field, forceInclude)
@@ -235,67 +359,22 @@ function FieldScanner:getEngineFieldById(fieldId)
     return nil
 end
 
----Collects owned fields for the overview panel.
+---Collects owned fields for the overview panel (sync; prefer incremental ToDoManager scan).
 ---@return table[] fields
 function FieldScanner:scanOwnedFields()
     local fields = {}
+    local candidates = self:collectOwnedFieldCandidates()
 
-    if g_fieldManager == nil then
-        return fields
-    end
-
-    -- Same source as SeasonalCropStress (g_fieldManager.fields); fallback to getFields().
-    local allFields = g_fieldManager.fields
-    if allFields == nil and g_fieldManager.getFields ~= nil then
-        allFields = g_fieldManager:getFields()
-    end
-
-    if allFields == nil then
-        return fields
-    end
-
-    local seenIds = {}
-
-    for _, field in pairs(allFields) do
+    for _, candidate in ipairs(candidates) do
         local ok, record = pcall(function()
-            return self:normalizeField(field)
+            return self:normalizeField(candidate.field, candidate.forceInclude)
         end)
-
         if ok and record ~= nil then
-            table.insert(fields, record)
-            seenIds[record.id] = true
+            fields[#fields + 1] = record
         end
     end
 
-    if g_currentMission ~= nil and g_currentMission.fieldToDoList ~= nil then
-        local manager = g_currentMission.fieldToDoList
-        if manager.manualTasks ~= nil and manager.fieldScanner == self then
-            for _, task in pairs(manager.manualTasks) do
-                local fieldId = tonumber(task.fieldId)
-                if fieldId ~= nil and not seenIds[fieldId] and not task.completed then
-                    local engineField = self:getEngineFieldById(fieldId)
-                    if engineField ~= nil then
-                        local ok, record = pcall(function()
-                            return self:normalizeField(engineField, true)
-                        end)
-                        if ok and record ~= nil then
-                            table.insert(fields, record)
-                            seenIds[record.id] = true
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    table.sort(fields, function(a, b)
-        if a.id == b.id then
-            return a.name < b.name
-        end
-        return a.id < b.id
-    end)
-
-    return fields
+    return self:sortFieldRecords(fields)
 end
 
 ---@param fieldId number

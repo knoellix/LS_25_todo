@@ -10,6 +10,8 @@
         <text name="ftdl_menu_title" text="Felder &amp; To-Do"/>
         <text name="ftdl_section_todo" text="To-Do Liste"/>
         <text name="ftdl_section_fields" text="Feldübersicht"/>
+        <text name="ftdl_scan_status_scanning" text="Felder werden gelesen (%d/%d)"/>
+        <text name="ftdl_scan_status_ready" text="Feldübersicht aktuell"/>
         <text name="ftdl_col_task" text="Aufgabe"/>
         <text name="ftdl_empty_tasks" text="Noch keine Aufgaben."/>
         <text name="ftdl_btn_add" text="Hinzufügen"/>

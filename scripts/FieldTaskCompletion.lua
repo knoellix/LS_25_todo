@@ -7,6 +7,8 @@ FieldTaskCompletion = {}
 
 FieldTaskCompletion.COMPLETION_THRESHOLD = 0.98
 FieldTaskCompletion.SAMPLE_GRID_STEPS = 5
+FieldTaskCompletion.OVERVIEW_SAMPLE_GRID_STEPS = 3
+FieldTaskCompletion.SAMPLE_EARLY_EXIT_MIN = 5
 
 --- Registry entry:
 ---   strategy = "coverage" | "sample" | "grass" | "point" | "none"
@@ -188,8 +190,9 @@ end
 ---@param field table
 ---@param centerX number
 ---@param centerZ number
+---@param gridSteps number|nil
 ---@return table[]
-function FieldTaskCompletion.collectSamplePoints(field, centerX, centerZ)
+function FieldTaskCompletion.collectSamplePoints(field, centerX, centerZ, gridSteps)
     local points = {}
     points[#points + 1] = { x = centerX, z = centerZ }
 
@@ -200,7 +203,7 @@ function FieldTaskCompletion.collectSamplePoints(field, centerX, centerZ)
 
     local areaM2 = areaHa * 10000
     local halfExtent = math.max(8, math.sqrt(areaM2) * 0.45)
-    local steps = math.max(1, FieldTaskCompletion.getSampleGridSteps())
+    local steps = math.max(1, tonumber(gridSteps) or FieldTaskCompletion.getSampleGridSteps())
 
     for ix = -steps, steps do
         for iz = -steps, steps do
@@ -257,14 +260,23 @@ function FieldTaskCompletion.getSampleGridRatio(field, task, centerX, centerZ)
 
     local total = 0
     local completed = 0
+    local threshold = FieldTaskCompletion.getThreshold()
+    local pointCount = #points
 
-    for _, point in ipairs(points) do
+    for pointIndex, point in ipairs(points) do
         local sampleState = FieldAdvisor.getEnrichedFieldState(field, task.fieldId, point.x, point.z)
         local sampleContext = FieldTaskCompletion.buildLightSampleContext(field, sampleState)
 
         total = total + 1
         if FieldTaskCompletion.isActionComplete(task.actionType, sampleContext, task) then
             completed = completed + 1
+        end
+
+        if total >= FieldTaskCompletion.SAMPLE_EARLY_EXIT_MIN then
+            local remaining = pointCount - pointIndex
+            if remaining > 0 and (completed + remaining) / (total + remaining) < threshold then
+                break
+            end
         end
     end
 
@@ -597,10 +609,44 @@ function FieldTaskCompletion.hasPointProgress(task, context)
     return FieldAdvisor.hasCompletionProgress(task, context)
 end
 
+---@param entry table|nil
+---@param fieldCache table|nil
+---@return boolean
+function FieldTaskCompletion.shouldUseCachedRatio(entry, fieldCache)
+    if fieldCache == nil or fieldCache.fingerprintMatch ~= true then
+        return false
+    end
+
+    -- Coverage uses polygon queries; edges can change while center fingerprint stays stable.
+    if entry == nil or entry.strategy == "coverage" then
+        return false
+    end
+
+    return true
+end
+
+---@param field table
+---@param posX number
+---@param posZ number
+---@return table
+function FieldTaskCompletion.newFieldCompletionCache(field, posX, posZ)
+    return {
+        field = field,
+        posX = posX,
+        posZ = posZ,
+        fieldState = nil,
+        fingerprint = nil,
+        fingerprintMatch = false,
+        ratios = {},
+        pointContext = nil,
+    }
+end
+
 ---@param task table
 ---@param scanner table
+---@param fieldCache table|nil
 ---@return boolean
-function FieldTaskCompletion.isTaskComplete(task, scanner)
+function FieldTaskCompletion.isTaskComplete(task, scanner, fieldCache)
     if task == nil or task.source ~= "field" or task.completed or task.autoComplete ~= true then
         return false
     end
@@ -614,18 +660,31 @@ function FieldTaskCompletion.isTaskComplete(task, scanner)
         return false
     end
 
-    if scanner == nil or scanner.getEngineFieldById == nil then
-        return false
+    local field = fieldCache ~= nil and fieldCache.field or nil
+    local posX = fieldCache ~= nil and fieldCache.posX or nil
+    local posZ = fieldCache ~= nil and fieldCache.posZ or nil
+
+    if field == nil or posX == nil or posZ == nil then
+        if scanner == nil or scanner.getEngineFieldById == nil then
+            return false
+        end
+
+        field = scanner:getEngineFieldById(task.fieldId)
+        if field == nil or field.getCenterOfFieldWorldPosition == nil then
+            return false
+        end
+
+        posX, posZ = field:getCenterOfFieldWorldPosition()
     end
 
-    local field = scanner:getEngineFieldById(task.fieldId)
-    if field == nil or field.getCenterOfFieldWorldPosition == nil then
-        return false
-    end
-
-    local posX, posZ = field:getCenterOfFieldWorldPosition()
     local threshold = FieldTaskCompletion.getThreshold()
-    local ratio = FieldTaskCompletion.getCompletionRatio(field, task, posX, posZ)
+    local ratio = fieldCache ~= nil and fieldCache.ratios[task.actionType] or nil
+    if ratio == nil or not FieldTaskCompletion.shouldUseCachedRatio(entry, fieldCache) then
+        ratio = FieldTaskCompletion.getCompletionRatio(field, task, posX, posZ)
+        if fieldCache ~= nil and fieldCache.ratios ~= nil then
+            fieldCache.ratios[task.actionType] = ratio
+        end
+    end
 
     if FieldTaskCompletion.requiresCoverageOnly(entry) then
         return ratio ~= nil and ratio >= threshold
@@ -639,8 +698,17 @@ function FieldTaskCompletion.isTaskComplete(task, scanner)
         return false
     end
 
-    local fieldState = FieldAdvisor.getEnrichedFieldState(field, task.fieldId, posX, posZ)
-    local context = FieldAdvisor.buildFieldContext(field, fieldState, posX, posZ)
+    local context = fieldCache ~= nil and fieldCache.pointContext or nil
+    if context == nil then
+        local fieldState = fieldCache ~= nil and fieldCache.fieldState or nil
+        if fieldState == nil then
+            fieldState = FieldAdvisor.getEnrichedFieldState(field, task.fieldId, posX, posZ)
+        end
+        context = FieldAdvisor.buildFieldContext(field, fieldState, posX, posZ)
+        if fieldCache ~= nil then
+            fieldCache.pointContext = context
+        end
+    end
 
     if FieldTaskCompletion.isActionComplete(task.actionType, context, task) then
         return true

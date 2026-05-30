@@ -4,7 +4,7 @@
 
 **Author:** Christian Möllmann ([knoellix](https://github.com/knoellix))  
 **License:** [GNU GPL v3](LICENSE)  
-**Version:** `0.1.0.4` (pre-release)
+**Version:** `0.1.0.5` (pre-release)
 
 ## Features
 
@@ -110,7 +110,7 @@ Use issue templates for bug reports, feature requests, and translations:
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes. Highlights in **0.1.0.4**: debug commands (`ftdlDump`), grass cross-scan for swaths, harvest/regrowth labels, weed coverage rule, advisor stability fixes.
+See [CHANGELOG.md](CHANGELOG.md) for release notes. Highlights in **0.1.0.5**: incremental field scan, scan status dot, targeted row refresh on auto-complete, 15 s passive rescan, performance caches.
 
 ## Current Work In Progress
 
